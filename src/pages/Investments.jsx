@@ -33,10 +33,10 @@ const Investments = () => {
           </div>
           <div className="relative z-10">
             <p className="text-[10px] font-bold text-blue-200 tracking-widest uppercase mb-1">Current Value</p>
-            <h3 className="text-3xl lg:text-4xl font-bold mb-3 dark:text-gray-100">$428,592.12</h3>
+            <h3 className="text-3xl lg:text-4xl font-bold mb-3 dark:text-gray-100">₹428,592.12</h3>
             <div className="flex items-center space-x-2">
               <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" /> +$12,402.50
+                <TrendingUp className="w-3 h-3 mr-1" /> +₹12,402.50
               </span>
               <span className="text-[10px] text-blue-200">Today's Performance</span>
             </div>
@@ -46,7 +46,7 @@ const Investments = () => {
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-40">
           <div>
             <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Total Invested</p>
-            <h3 className="text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-gray-200">$312,000.00</h3>
+            <h3 className="text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹312,000.00</h3>
           </div>
           <div className="flex justify-between items-end">
             <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Cash Basis</p>
@@ -68,7 +68,7 @@ const Investments = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         
-        {/* AREA CHART FROM PREVIOUS STEP */}
+        {/* AREA CHART */}
         <div className="xl:col-span-2 bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -83,7 +83,7 @@ const Investments = () => {
           <AreaChart data={portfolioPerformanceData} />
         </div>
 
-        {/* PIE CHART FROM PREVIOUS STEP */}
+        {/* PIE CHART */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Asset Allocation</h2>
@@ -136,7 +136,7 @@ const Investments = () => {
                 <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-widest">Next: Oct 05</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">$1,200.00</p>
+                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">₹1,200.00</p>
               </div>
             </div>
             <div className="bg-white dark:bg-[#1E1E1E] p-4 rounded-xl shadow-sm border border-gray-100 dark:border-[#262626] flex justify-between items-center">
@@ -145,7 +145,7 @@ const Investments = () => {
                 <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-widest">Next: Oct 12</p>
               </div>
               <div className="text-right">
-                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">$450.00</p>
+                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">₹450.00</p>
               </div>
             </div>
           </div>
@@ -162,7 +162,7 @@ const Investments = () => {
             <div>
               <h3 className="text-lg font-bold text-white mb-2">Tax Harvesting Opportunity</h3>
               <p className="text-xs text-gray-400 dark:text-blue-100 leading-relaxed mb-6">
-                You have $2,400 in unrealized short-term losses. Consider switching some equity holdings to offset gains.
+                You have ₹2,400 in unrealized short-term losses. Consider switching some equity holdings to offset gains.
               </p>
               <button className="text-[10px] font-bold text-white uppercase tracking-widest border-b border-white pb-0.5 hover:text-blue-200 hover:border-blue-200 transition-colors">
                 Review Harvest strategy
@@ -180,7 +180,7 @@ const Investments = () => {
           </div>
           <h3 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-2">Recent Activity</h3>
           <p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-6 max-w-xs">
-            Switch of $5,000 from Alpha MF to Beta Stocks completed yesterday.
+            Switch of ₹5,000 from Alpha MF to Beta Stocks completed yesterday.
           </p>
           <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-gray-400 tracking-widest uppercase hover:underline">
             View History

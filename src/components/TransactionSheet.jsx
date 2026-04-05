@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { createPortal } from 'react-dom'; // <-- Imported createPortal
+import { createPortal } from 'react-dom';
 import { X, ArrowRight } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 
@@ -26,7 +26,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
       catSub: 'General',
       source: 'Manual Entry',
       sourceLast: 'XXXX',
-      amount: formData.type === 'negative' ? `-$${parseFloat(formData.amount).toFixed(2)}` : `+$${parseFloat(formData.amount).toFixed(2)}`,
+      amount: formData.type === 'negative' ? `-₹${parseFloat(formData.amount).toFixed(2)}` : `+₹${parseFloat(formData.amount).toFixed(2)}`,
       amountType: formData.type,
       status: 'Cleared',
       icon: 'ShoppingCart',
@@ -40,15 +40,12 @@ const TransactionSheet = ({ isOpen, onClose }) => {
     onClose();
   };
 
-  // We use createPortal to attach this directly to the <body> tag.
-  // We also removed the unmounting logic so the CSS transitions trigger smoothly.
   return createPortal(
     <div 
       className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${
         isOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible delay-300'
       }`}
     >
-      {/* Backdrop */}
       <div 
         className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${
           isOpen ? 'opacity-100' : 'opacity-0'
@@ -56,7 +53,6 @@ const TransactionSheet = ({ isOpen, onClose }) => {
         onClick={onClose}
       ></div>
       
-      {/* Slide-out Sheet */}
       <div 
         className={`absolute inset-y-0 right-0 z-10 w-full max-w-md bg-[#F8F9FA] dark:bg-[#121212] border-l border-gray-200 dark:border-[#262626] shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
@@ -88,7 +84,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Amount ($)</label>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Amount (₹)</label>
                 <input 
                   required
                   type="number" 

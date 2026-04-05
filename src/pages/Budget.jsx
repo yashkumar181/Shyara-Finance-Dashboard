@@ -39,8 +39,8 @@ const Budget = () => {
           <div>
             <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">Total Monthly Budget</p>
             <div className="flex items-baseline gap-2">
-              <h2 className="text-3xl font-bold text-[#0F172A] dark:text-gray-200">${totalSpent.toLocaleString()}</h2>
-              <span className="text-sm font-bold text-gray-400 dark:text-gray-600">/ ${totalAllocated.toLocaleString()}</span>
+              <h2 className="text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹{totalSpent.toLocaleString()}</h2>
+              <span className="text-sm font-bold text-gray-400 dark:text-gray-600">/ ₹{totalAllocated.toLocaleString()}</span>
             </div>
           </div>
         </div>
@@ -74,8 +74,8 @@ const Budget = () => {
               </div>
               
               <div className="flex justify-between items-end mb-2">
-                <p className="text-lg font-bold text-[#0F172A] dark:text-gray-200">${cat.spent}</p>
-                <p className="text-[10px] font-bold text-gray-400 dark:text-[#a3a3a3]">Limit: ${cat.allocated}</p>
+                <p className="text-lg font-bold text-[#0F172A] dark:text-gray-200">₹{cat.spent}</p>
+                <p className="text-[10px] font-bold text-gray-400 dark:text-[#a3a3a3]">Limit: ₹{cat.allocated}</p>
               </div>
               
               <div className="w-full h-2.5 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden">

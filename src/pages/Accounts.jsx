@@ -18,16 +18,16 @@ const Accounts = () => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-2 uppercase">Net Worth</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">$420,840.00</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹420,840.00</h3>
         </div>
         <div className="bg-[#F0F5FF] dark:bg-[#1A2235] p-6 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30">
           <p className="text-[10px] font-bold text-gray-500 dark:text-blue-300 tracking-wider mb-2 uppercase">Total Assets</p>
-          <h3 className="text-2xl font-bold text-[#0A3D8B] dark:text-blue-400">$485,320.00</h3>
+          <h3 className="text-2xl font-bold text-[#0A3D8B] dark:text-blue-400">₹485,320.00</h3>
         </div>
         <div className="bg-[#FFF0F0] dark:bg-[#3A1C1C] p-6 rounded-2xl shadow-sm border border-red-50 dark:border-red-900/30 relative overflow-hidden">
           <div className="relative z-10">
             <p className="text-[10px] font-bold text-gray-500 dark:text-red-300 tracking-wider mb-2 uppercase">Total Liabilities</p>
-            <h3 className="text-2xl font-bold text-red-800 dark:text-red-400">-$64,480.00</h3>
+            <h3 className="text-2xl font-bold text-red-800 dark:text-red-400">-₹64,480.00</h3>
           </div>
           <svg className="absolute bottom-0 right-0 w-24 h-12 text-red-200 dark:text-red-900/50" viewBox="0 0 100 50" preserveAspectRatio="none">
             <path d="M0,50 L20,30 L40,40 L60,10 L80,20 L100,0 L100,50 Z" fill="currentColor" opacity="0.3" />
@@ -65,7 +65,7 @@ const Accounts = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Available Balance</p>
-                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">$12,450.00</h3>
+                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹12,450.00</h3>
                 </div>
                 <div className="flex justify-between items-end">
                   <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3]">Monthly Yield: <span className="text-emerald-600 dark:text-emerald-400 font-bold">+3.2%</span></p>
@@ -87,7 +87,7 @@ const Accounts = () => {
                 </div>
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Wallet Balance</p>
-                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">$2,105.80</h3>
+                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹2,105.80</h3>
                 </div>
                 <div>
                   <div className="w-full h-1.5 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden mb-2">
@@ -123,11 +123,11 @@ const Accounts = () => {
                 <div className="flex space-x-8 sm:space-x-12">
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-1 uppercase">Current Due</p>
-                    <h3 className="text-xl font-bold text-white">$4,820.00</h3>
+                    <h3 className="text-xl font-bold text-white">₹4,820.00</h3>
                   </div>
                   <div>
                     <p className="text-[9px] font-bold text-gray-400 tracking-widest mb-1 uppercase">Credit Limit</p>
-                    <h3 className="text-xl font-bold text-white">$25,000.00</h3>
+                    <h3 className="text-xl font-bold text-white">₹25,000.00</h3>
                   </div>
                 </div>
               </div>
@@ -166,7 +166,7 @@ const Accounts = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">Housing Loan</span>
-                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">$48,200</span>
+                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">₹48,200</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden">
                   <div className="h-full bg-blue-500 w-[65%] rounded-full"></div>
@@ -175,7 +175,7 @@ const Accounts = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">Credit Cards</span>
-                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">$12,480</span>
+                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">₹12,480</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden">
                   <div className="h-full bg-orange-500 w-[20%] rounded-full"></div>
@@ -184,7 +184,7 @@ const Accounts = () => {
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">Personal Lines</span>
-                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">$3,800</span>
+                  <span className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3]">₹3,800</span>
                 </div>
                 <div className="w-full h-1.5 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden">
                   <div className="h-full bg-red-800 dark:bg-red-500 w-[10%] rounded-full"></div>
@@ -224,7 +224,7 @@ const Accounts = () => {
                 <td className="px-6 py-4">
                   <span className="bg-blue-50 dark:bg-[#262626] text-blue-700 dark:text-blue-400 border border-blue-100 dark:border-transparent px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider">Settled</span>
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-bold text-[#0F172A] dark:text-gray-200">-$124.50</td>
+                <td className="px-6 py-4 text-right text-sm font-bold text-[#0F172A] dark:text-gray-200">-₹124.50</td>
               </tr>
               <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
                 <td className="px-6 py-4 flex items-center space-x-4">
@@ -238,7 +238,7 @@ const Accounts = () => {
                 <td className="px-6 py-4">
                   <span className="bg-emerald-50 dark:bg-[#262626] text-emerald-700 dark:text-emerald-400 border border-emerald-100 dark:border-transparent px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider">Cleared</span>
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600 dark:text-emerald-400">+$4,250.00</td>
+                <td className="px-6 py-4 text-right text-sm font-bold text-emerald-600 dark:text-emerald-400">+₹4,250.00</td>
               </tr>
               <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
                 <td className="px-6 py-4 flex items-center space-x-4">
@@ -252,7 +252,7 @@ const Accounts = () => {
                 <td className="px-6 py-4">
                   <span className="bg-orange-50 dark:bg-[#262626] text-orange-700 dark:text-orange-400 border border-orange-100 dark:border-transparent px-2 py-1 rounded text-[9px] font-bold uppercase tracking-wider">Pending</span>
                 </td>
-                <td className="px-6 py-4 text-right text-sm font-bold text-[#0F172A] dark:text-gray-200">-$25.00</td>
+                <td className="px-6 py-4 text-right text-sm font-bold text-[#0F172A] dark:text-gray-200">-₹25.00</td>
               </tr>
             </tbody>
           </table>

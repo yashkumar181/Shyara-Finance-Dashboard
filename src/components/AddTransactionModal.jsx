@@ -28,7 +28,7 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
       catSub: 'General',
       source: 'Manual Entry',
       sourceLast: 'XXXX',
-      amount: formData.type === 'negative' ? `-$${parseFloat(formData.amount).toFixed(2)}` : `+$${parseFloat(formData.amount).toFixed(2)}`,
+      amount: formData.type === 'negative' ? `-₹${parseFloat(formData.amount).toFixed(2)}` : `+₹${parseFloat(formData.amount).toFixed(2)}`,
       amountType: formData.type,
       status: 'Cleared',
       icon: 'ShoppingCart',
@@ -69,7 +69,7 @@ const AddTransactionModal = ({ isOpen, onClose }) => {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Amount ($)</label>
+              <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-1.5">Amount (₹)</label>
               <input 
                 required
                 type="number" 

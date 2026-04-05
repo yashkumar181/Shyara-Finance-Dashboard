@@ -32,7 +32,7 @@ const Dashboard = () => {
             <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full">+12.4%</span>
           </div>
           <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Net Worth</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-4">$2,482,910.42</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-4">₹2,482,910.42</h3>
           <div className="w-16 h-1 bg-[#0A3D8B] dark:bg-gray-400 rounded-full"></div>
         </div>
 
@@ -42,7 +42,7 @@ const Dashboard = () => {
             <span className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-[10px] font-bold px-2 py-1 rounded-full">+4.2%</span>
           </div>
           <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Monthly Cash Flow</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">$14,290.00</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">₹14,290.00</h3>
           <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3] uppercase">Efficiency: <span className="text-emerald-500">A-</span></p>
         </div>
 
@@ -52,7 +52,7 @@ const Dashboard = () => {
             <span className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 dark:text-rose-400 text-[10px] font-bold px-2 py-1 rounded-full">-1.8%</span>
           </div>
           <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Discretionary Surplus</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">$3,104.50</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">₹3,104.50</h3>
           <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3]">Remaining cycle: 8 days</p>
         </div>
 
@@ -90,7 +90,7 @@ const Dashboard = () => {
             <div className="mb-8">
               <div className="flex justify-between text-xs font-bold mb-3 uppercase tracking-wide">
                 <span className="text-[#0F172A] dark:text-gray-200">Total Inflow</span>
-                <span className="text-[#0F172A] dark:text-gray-200">$18,400</span>
+                <span className="text-[#0F172A] dark:text-gray-200">₹18,400</span>
               </div>
               <div className="w-full h-3 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden">
                 <div className="h-full bg-[#0A3D8B] dark:bg-gray-400 w-full rounded-full"></div>
@@ -101,7 +101,7 @@ const Dashboard = () => {
                 <div className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-wide mb-1">Committed</div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-[10px] text-gray-400 dark:text-[#a3a3a3] uppercase">(Mortgage, Utils)</span>
-                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">$8,200</span>
+                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹8,200</span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden"><div className="h-full bg-gray-600 dark:bg-gray-600 w-3/4 rounded-full"></div></div>
               </div>
@@ -109,7 +109,7 @@ const Dashboard = () => {
                 <div className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-wide mb-1">Discretionary</div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-[10px] text-gray-400 dark:text-[#a3a3a3] uppercase">(Travel, Dining)</span>
-                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">$3,104</span>
+                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹3,104</span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden"><div className="h-full bg-orange-500 w-1/3 rounded-full"></div></div>
               </div>
@@ -117,7 +117,7 @@ const Dashboard = () => {
                 <div className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-wide mb-1">Residual Surplus</div>
                 <div className="flex justify-between items-end mb-2">
                   <span className="text-[10px] text-gray-400 uppercase">&nbsp;</span>
-                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">$6,096</span>
+                  <span className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹6,096</span>
                 </div>
                 <div className="w-full h-2 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden"><div className="h-full bg-[#0A3D8B] dark:bg-gray-400 w-1/2 rounded-full"></div></div>
               </div>
@@ -137,7 +137,7 @@ const Dashboard = () => {
                 <span className="text-sm font-bold text-gray-500 dark:text-[#a3a3a3]">82%</span>
               </div>
               <div className="w-full h-2 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden mb-2"><div className="h-full bg-rose-600 dark:bg-gray-500 w-[82%] rounded-full"></div></div>
-              <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-semibold">$164,000 of $200,000</p>
+              <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-semibold">₹164,000 of ₹200,000</p>
             </div>
             <div>
               <div className="flex justify-between items-center mb-2">
@@ -145,7 +145,7 @@ const Dashboard = () => {
                 <span className="text-sm font-bold text-gray-500 dark:text-[#a3a3a3]">34%</span>
               </div>
               <div className="w-full h-2 bg-gray-200 dark:bg-[#0a0a0a] rounded-full overflow-hidden mb-2"><div className="h-full bg-[#0A3D8B] dark:bg-gray-500 w-[34%] rounded-full"></div></div>
-              <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-semibold">$42,500 of $125,000</p>
+              <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-semibold">₹42,500 of ₹125,000</p>
             </div>
           </div>
 

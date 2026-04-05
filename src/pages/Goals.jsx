@@ -26,7 +26,7 @@ const Goals = () => {
             <h3 className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Spending By Category</h3>
             <PieChart className="w-4 h-4 text-gray-400 dark:text-gray-600" />
           </div>
-          <h2 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-6">$14,280.00</h2>
+          <h2 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-6">₹14,280.00</h2>
           
           <div className="flex items-center justify-between">
             <div className="relative w-32 h-32">
@@ -92,7 +92,7 @@ const Goals = () => {
           <div className="flex justify-between mb-8">
             <div>
               <p className="text-[8px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Avg Ticket Size</p>
-              <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">$24.50</h3>
+              <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">₹24.50</h3>
             </div>
             <div className="text-right">
               <p className="text-[8px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Frequency</p>
@@ -105,11 +105,11 @@ const Goals = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center text-[11px]">
                 <div className="flex items-center text-gray-500 dark:text-[#a3a3a3]"><div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 mr-3"></div>Oct 24, 2023</div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">-$28.12</span>
+                <span className="font-bold text-[#0F172A] dark:text-gray-200">-₹28.12</span>
               </div>
               <div className="flex justify-between items-center text-[11px]">
                 <div className="flex items-center text-gray-500 dark:text-[#a3a3a3]"><div className="w-1 h-1 rounded-full bg-gray-400 dark:bg-gray-500 mr-3"></div>Oct 21, 2023</div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">-$19.45</span>
+                <span className="font-bold text-[#0F172A] dark:text-gray-200">-₹19.45</span>
               </div>
             </div>
           </div>
@@ -123,7 +123,7 @@ const Goals = () => {
             <p className="text-[11px] text-gray-500 dark:text-[#a3a3a3]">Projection for next 30 days based on recurring cycles</p>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="text-xl font-bold text-[#991B1B] dark:text-red-400">-$2,140.00</span>
+            <span className="text-xl font-bold text-[#991B1B] dark:text-red-400">-₹2,140.00</span>
             <span className="bg-red-50 dark:bg-[#262626] text-red-700 dark:text-red-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider border border-transparent dark:border-[#262626]">Pending</span>
           </div>
         </div>
@@ -133,21 +133,21 @@ const Goals = () => {
             <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-wider mb-1">Nov 02</p>
             <p className="text-[11px] font-bold text-[#0F172A] dark:text-gray-200 mb-2">AWS Cloud</p>
             <div className="w-2 h-2 rounded-full bg-[#1E3A8A] dark:bg-gray-400 mb-2"></div>
-            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">$142.00</p>
+            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">₹142.00</p>
             <span className="bg-[#F0F5FF] dark:bg-[#0a0a0a] text-[#1E3A8A] dark:text-gray-400 text-[7px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider w-fit border border-transparent dark:border-[#262626]">SAAS</span>
           </div>
           <div className="min-w-fit flex flex-col">
             <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-wider mb-1">Nov 05</p>
             <p className="text-[11px] font-bold text-[#0F172A] dark:text-gray-200 mb-2">Rent / Lease</p>
             <div className="w-2 h-2 rounded-full bg-[#3B82F6] dark:bg-gray-500 mb-2"></div>
-            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">$1,200.00</p>
+            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">₹1,200.00</p>
             <span className="bg-blue-50 dark:bg-[#0a0a0a] text-blue-600 dark:text-gray-400 border border-blue-100 dark:border-[#262626] text-[7px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider w-fit">FIXED</span>
           </div>
           <div className="min-w-fit flex flex-col">
             <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-wider mb-1">Nov 18</p>
             <p className="text-[11px] font-bold text-[#0F172A] dark:text-gray-200 mb-2">Netflix Premium</p>
             <div className="w-2 h-2 rounded-full bg-gray-400 dark:bg-gray-600 mb-2"></div>
-            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">$19.99</p>
+            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-2">₹19.99</p>
             <span className="bg-orange-50 dark:bg-[#0a0a0a] text-orange-700 dark:text-gray-400 border border-transparent dark:border-[#262626] text-[7px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider w-fit">LIFESTYLE</span>
           </div>
         </div>
@@ -191,7 +191,7 @@ const Goals = () => {
                   </div>
                 </td>
                 <td className="px-6 py-5 text-[11px] font-medium text-gray-600 dark:text-[#a3a3a3]">Oct 28, 2023</td>
-                <td className="px-6 py-5 text-xs font-bold text-[#991B1B] dark:text-red-400 text-right">-$48.00</td>
+                <td className="px-6 py-5 text-xs font-bold text-[#991B1B] dark:text-red-400 text-right">-₹48.00</td>
                 <td className="px-6 py-5 text-center">
                   <span className="bg-[#3A2218] dark:bg-[#262626] text-white dark:text-gray-300 text-[8px] font-bold px-2 py-1.5 rounded uppercase tracking-widest">Settled</span>
                 </td>

@@ -12,16 +12,16 @@ const Subscriptions = () => {
         <div className="xl:col-span-2 bg-white dark:bg-[#1E1E1E] p-8 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 flex flex-col justify-between">
           <div>
             <p className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-4">Total Monthly Burn</p>
-            <h2 className="text-5xl font-bold text-[#0F172A] dark:text-gray-200 mb-3">$428.50</h2>
+            <h2 className="text-5xl font-bold text-[#0F172A] dark:text-gray-200 mb-3">₹428.50</h2>
             <p className="text-sm font-semibold text-red-700 dark:text-red-400 flex items-center mb-8">
               <TrendingUp className="w-4 h-4 mr-1" />
-              +$12.99 <span className="text-gray-400 dark:text-gray-500 ml-1 font-medium">since last month</span>
+              +₹12.99 <span className="text-gray-400 dark:text-gray-500 ml-1 font-medium">since last month</span>
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
             <div className="bg-[#F0F5FF] dark:bg-[#1A2235] px-6 py-4 rounded-xl border border-blue-50 dark:border-blue-900/30 w-40 flex-1 sm:flex-none">
               <p className="text-[9px] font-bold text-gray-500 dark:text-blue-300 uppercase tracking-widest mb-1">Yearly Forecast</p>
-              <h4 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">$5,142.00</h4>
+              <h4 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">₹5,142.00</h4>
             </div>
             <div className="bg-[#F0F5FF] dark:bg-[#1A2235] px-6 py-4 rounded-xl border border-blue-50 dark:border-blue-900/30 w-40 flex-1 sm:flex-none">
               <p className="text-[9px] font-bold text-gray-500 dark:text-blue-300 uppercase tracking-widest mb-1">Active Services</p>
@@ -38,7 +38,7 @@ const Subscriptions = () => {
             <h3 className="text-[#3A2218] dark:text-orange-200 font-bold text-sm">Subscription Audit</h3>
           </div>
           <p className="text-xs text-[#8A4D35] dark:text-orange-300/80 font-medium leading-relaxed mb-6">
-            We found <span className="font-bold">2 unused services</span> and <span className="font-bold">1 duplicate charge</span> that could save you <span className="font-bold">$45.00/mo.</span>
+            We found <span className="font-bold">2 unused services</span> and <span className="font-bold">1 duplicate charge</span> that could save you <span className="font-bold">₹45.00/mo.</span>
           </p>
           <div className="space-y-3">
             <div className="bg-white/60 dark:bg-white/5 p-3 rounded-lg flex justify-between items-center border border-white/40 dark:border-white/5">
@@ -140,13 +140,13 @@ const Subscriptions = () => {
         <div className="bg-[#F0F5FF] dark:bg-[#1A2235] p-6 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30 flex flex-col items-center justify-center text-center">
           <PiggyBank className="w-6 h-6 text-[#0A3D8B] dark:text-blue-400 mb-3" />
           <p className="text-[10px] font-bold text-gray-500 dark:text-blue-300 uppercase tracking-widest mb-1">Potential Savings</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">$540/yr</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹540/yr</h3>
         </div>
 
         <div className="bg-[#F8FAFC] dark:bg-[#1E1E1E] p-6 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 flex flex-col items-center justify-center text-center">
           <Calendar className="w-6 h-6 text-[#0A3D8B] dark:text-gray-400 mb-3" />
           <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-1">Average Daily Cost</p>
-          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">$14.28</h3>
+          <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹14.28</h3>
         </div>
       </div>
     </div>
