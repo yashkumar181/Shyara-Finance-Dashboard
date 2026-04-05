@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
+import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart, PieChart } from 'lucide-react';
 import AddTransactionModal from './AddTransactionModal';
 import TransactionSheet from './TransactionSheet';
-import { PieChart } from 'lucide-react';
+import myLogo from '../assets/logo.jpg';
+
 const Sidebar = () => {
-  const { role } = useFinance();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const navLinkClass = ({ isActive }) => {
@@ -23,12 +22,14 @@ const Sidebar = () => {
         
         <div>
           <div className="h-20 flex items-center px-6">
-            <div className="bg-[#0F172A] dark:bg-gray-200 w-8 h-8 rounded flex items-center justify-center mr-3 shrink-0 shadow-inner">
-              <div className="w-3 h-3 border-2 border-blue-400 dark:border-[#121212] rounded-sm transform rotate-45 transition-colors"></div>
-            </div>
+            <img 
+              src={myLogo} 
+              alt="Shyara Logo" 
+              className="w-8 h-8 rounded mr-3 shrink-0 object-contain" 
+            />
             <div>
-              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Fiscal Clarity</h1>
-              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">The Precision Curator</p>
+              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara</h1>
+              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Financial Dashboard</p>
             </div>
           </div>
           
@@ -43,13 +44,11 @@ const Sidebar = () => {
             <NavLink to="/settings" className={navLinkClass}><Settings className="w-4 h-4 mr-3 shrink-0" /> SETTINGS</NavLink>
           </nav>
           
-          {role === 'Admin' && (
-            <div className="px-6 mt-8">
-              <button onClick={() => setIsModalOpen(true)} className="w-full bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white flex items-center justify-center py-3 rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-md">
-                <Plus className="w-4 h-4 mr-2" /> NEW TRANSACTION
-              </button>
-            </div>
-          )}
+          <div className="px-6 mt-8">
+            <button onClick={() => setIsModalOpen(true)} className="w-full bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white flex items-center justify-center py-3 rounded-lg text-xs font-semibold tracking-wide transition-colors shadow-md">
+              <Plus className="w-4 h-4 mr-2" /> NEW TRANSACTION
+            </button>
+          </div>
         </div>
         
         <div className="p-6">

@@ -4,7 +4,7 @@ import { initialTransactions } from '../data/mockData';
 const FinanceContext = createContext();
 
 export const FinanceProvider = ({ children }) => {
-  const [role, setRole] = useState('Admin'); 
+  // role state has been completely removed
   
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem('financial_dashboard_txs');
@@ -20,7 +20,7 @@ export const FinanceProvider = ({ children }) => {
   };
 
   return (
-    <FinanceContext.Provider value={{ role, setRole, transactions, addTransaction }}>
+    <FinanceContext.Provider value={{ transactions, addTransaction }}>
       {children}
     </FinanceContext.Provider>
   );

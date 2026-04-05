@@ -1,10 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Search, Moon, Sun } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
 
 const Header = () => {
-  const { role, setRole } = useFinance();
-  
   const [isDarkMode, setIsDarkMode] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('theme') === 'dark' || 
@@ -36,20 +33,8 @@ const Header = () => {
           />
         </div>
         
-        <div className="hidden md:flex space-x-6">
-          <button 
-            onClick={() => setRole('Admin')}
-            className={`font-medium text-sm pb-7 pt-7 transition-colors ${role === 'Admin' ? 'text-[#0A3D8B] dark:text-gray-200 border-b-2 border-[#0A3D8B] dark:border-gray-200' : 'text-gray-400 dark:text-[#a3a3a3] hover:text-gray-600 dark:hover:text-gray-300'}`}
-          >
-            Admin
-          </button>
-          <button 
-            onClick={() => setRole('Viewer')}
-            className={`font-medium text-sm pb-7 pt-7 transition-colors ${role === 'Viewer' ? 'text-[#0A3D8B] dark:text-gray-200 border-b-2 border-[#0A3D8B] dark:border-gray-200' : 'text-gray-400 dark:text-[#a3a3a3] hover:text-gray-600 dark:hover:text-gray-300'}`}
-          >
-            Viewer
-          </button>
-        </div>
+        {/* Toggle buttons have been removed from here */}
+        
       </div>
       
       <div className="flex items-center space-x-2 md:space-x-6 shrink-0">
@@ -67,12 +52,11 @@ const Header = () => {
         
         <div className="flex items-center space-x-3 pl-2 border-l border-gray-200 dark:border-[#262626]">
           <div className="text-right hidden sm:block">
-            <p className="text-sm font-semibold text-[#0F172A] dark:text-gray-200">Alex Stratton</p>
+            <p className="text-sm font-semibold text-[#0F172A] dark:text-gray-200">Yash Kumar</p>
             <p className="text-[10px] font-bold text-gray-400 dark:text-[#a3a3a3] tracking-wider uppercase">
-              {role === 'Admin' ? 'Senior Auditor' : 'Guest Viewer'}
-            </p>
+            Pro Member</p>
           </div>
-          <img src="https://ui-avatars.com/api/?name=Alex+Stratton&background=121212&color=fff" alt="Profile" className="w-8 h-8 md:w-10 md:h-10 rounded-lg shadow-sm border border-gray-200 dark:border-[#262626]" />
+          <img src="https://ui-avatars.com/api/?name=Yash&background=121212&color=fff" alt="Profile" className="w-8 h-8 md:w-10 md:h-10 rounded-lg shadow-sm border border-gray-200 dark:border-[#262626]" />
         </div>
       </div>
     </header>
