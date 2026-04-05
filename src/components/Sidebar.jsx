@@ -3,7 +3,8 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import AddTransactionModal from './AddTransactionModal';
-
+import TransactionSheet from './TransactionSheet';
+import { PieChart } from 'lucide-react';
 const Sidebar = () => {
   const { role } = useFinance();
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -38,6 +39,7 @@ const Sidebar = () => {
             <NavLink to="/subscriptions" className={navLinkClass}><PlaySquare className="w-4 h-4 mr-3 shrink-0" /> SUBSCRIPTIONS</NavLink>
             <NavLink to="/investments" className={navLinkClass}><LineChart className="w-4 h-4 mr-3 shrink-0" /> INVESTMENTS</NavLink>
             <NavLink to="/goals" className={navLinkClass}><Target className="w-4 h-4 mr-3 shrink-0" /> GOALS</NavLink>
+            <NavLink to="/budget" className={navLinkClass}><PieChart className="w-4 h-4 mr-3 shrink-0" /> BUDGET </NavLink>
             <NavLink to="/settings" className={navLinkClass}><Settings className="w-4 h-4 mr-3 shrink-0" /> SETTINGS</NavLink>
           </nav>
           
@@ -57,7 +59,7 @@ const Sidebar = () => {
         </div>
       </div>
 
-      <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <TransactionSheet isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </>
   );
 };

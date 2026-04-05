@@ -13,3 +13,18 @@ html, body {
   transition-property: background-color, border-color, color, fill, stroke;
   transition-duration: 300ms;
 }
+/* Add this to the bottom of index.css */
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

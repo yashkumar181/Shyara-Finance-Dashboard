@@ -9,7 +9,7 @@ import Investments from './pages/Investments';
 import Goals from './pages/Goals';
 import Settings from './pages/Settings';
 import { FinanceProvider } from './context/FinanceContext';
-
+import Budget from './pages/Budget';
 function App() {
   return (
     <FinanceProvider>
@@ -27,7 +27,7 @@ function App() {
             <Route path="investments" element={<Investments />} />
             <Route path="goals" element={<Goals />} />
             <Route path="settings" element={<Settings />} />
-            
+            <Route path="budget" element={<Budget />} />
             {/* Catch-all for undefined routes */}
             <Route path="*" element={
               <div className="flex-1 flex items-center justify-center">

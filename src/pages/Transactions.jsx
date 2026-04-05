@@ -5,8 +5,7 @@ import {
   ShoppingCart, Tv, CreditCard
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
-import AddTransactionModal from '../components/AddTransactionModal';
-
+import TransactionSheet from '../components/TransactionSheet';
 const iconMap = { Laptop, Home, ShoppingCart, Tv, CreditCard };
 
 const Transactions = () => {
@@ -172,7 +171,7 @@ const Transactions = () => {
         </div>
       </div>
 
-      <AddTransactionModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <TransactionSheet isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 };
