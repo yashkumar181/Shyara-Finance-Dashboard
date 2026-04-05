@@ -1,33 +1,56 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Download, Plus, ChevronDown, MoreVertical, 
   ChevronLeft, ChevronRight, Search, Laptop, Home, 
   ShoppingCart, Tv, CreditCard
 } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
-import TransactionSheet from '../components/TransactionSheet';
+import { useApi } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
+
 const iconMap = { Laptop, Home, ShoppingCart, Tv, CreditCard };
 
 const Transactions = () => {
-  const { transactions, role } = useFinance();
+  const api = useApi();
+  const { transactions, transactionsLoading, setTransactions, setTransactionsLoading } = useAppStore();
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [accountFilter, setAccountFilter] = useState('All Accounts');
   const [sortOrder, setSortOrder] = useState('Date (Newest)');
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const parseAmount = (amountStr) => parseFloat(amountStr.replace(/[^0-9.-]+/g, ""));
+  useEffect(() => {
+    const fetchLedger = async () => {
+      setTransactionsLoading(true);
+      try {
+        const data = await api.getTransactions();
+        setTransactions(data);
+      } catch (error) {
+        console.error("Error fetching transactions:", error);
+      } finally {
+        setTransactionsLoading(false);
+      }
+    };
+    fetchLedger();
+  }, [api, setTransactions, setTransactionsLoading]);
 
+  // Filtering Logic mapping to backend schema
   let processedTransactions = transactions.filter((tx) => {
-    const matchesSearch = tx.merchant.toLowerCase().includes(searchTerm.toLowerCase()) || tx.desc.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'All Categories' || tx.catMain === categoryFilter;
-    const matchesAccount = accountFilter === 'All Accounts' || tx.source === accountFilter;
+    const merchantName = tx.merchant || tx.name || "Unknown";
+    const catMain = tx.category || "Uncategorized";
+    const source = tx.accountName || "Unknown";
+    
+    const matchesSearch = merchantName.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          (tx.notes || "").toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = categoryFilter === 'All Categories' || catMain === categoryFilter;
+    const matchesAccount = accountFilter === 'All Accounts' || source === accountFilter;
+    
     return matchesSearch && matchesCategory && matchesAccount;
   });
 
+  // Sorting Logic (Backend sends pure numbers now, so this is much cleaner)
   processedTransactions = processedTransactions.sort((a, b) => {
-    if (sortOrder === 'Amount (High to Low)') return parseAmount(b.amount) - parseAmount(a.amount);
-    if (sortOrder === 'Amount (Low to High)') return parseAmount(a.amount) - parseAmount(b.amount);
+    if (sortOrder === 'Amount (High to Low)') return b.amount - a.amount;
+    if (sortOrder === 'Amount (Low to High)') return a.amount - b.amount;
     if (sortOrder === 'Date (Oldest)') return new Date(a.date) - new Date(b.date);
     return new Date(b.date) - new Date(a.date);
   });
@@ -37,8 +60,11 @@ const Transactions = () => {
   };
 
   const handleExportCSV = () => {
-    const headers = "Date,Time,Merchant,Category,Account,Amount,Status\n";
-    const csvRows = processedTransactions.map(tx => `"${tx.date}","${tx.time}","${tx.merchant}","${tx.catMain}","${tx.source}","${tx.amount}","${tx.status}"`).join("\n");
+    const headers = "Date,Merchant,Category,Account,Amount,Type\n";
+    const csvRows = processedTransactions.map(tx => 
+      `"${new Date(tx.date).toLocaleDateString()}","${tx.merchant || tx.name}","${tx.category}","${tx.accountName}","${tx.amount}","${tx.type}"`
+    ).join("\n");
+    
     const blob = new Blob([headers + csvRows], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -60,11 +86,6 @@ const Transactions = () => {
             <Download className="w-4 h-4 mr-2" />
             Export CSV
           </button>
-          {role === 'Admin' && (
-            <button onClick={() => setIsModalOpen(true)} className="flex items-center px-4 py-2 bg-[#0A3D8B] dark:bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-[#082f6b] dark:hover:bg-blue-500 transition-colors shadow-sm">
-              <Plus className="w-4 h-4 mr-2" /> Add Transaction
-            </button>
-          )}
         </div>
       </div>
 
@@ -83,7 +104,7 @@ const Transactions = () => {
             </div>
             <div className="relative">
               <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
-                <option>All Accounts</option><option>Amex Gold</option><option>Chase Sapphire</option><option>Manual Entry</option>
+                <option>All Accounts</option><option>Bank</option><option>Credit Card</option><option>Manual Entry</option>
               </select>
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none"><ChevronDown className="w-4 h-4 text-gray-500 dark:text-[#a3a3a3]" /></div>
             </div>
@@ -98,7 +119,11 @@ const Transactions = () => {
         </div>
 
         <div className="overflow-x-auto min-h-[300px]">
-          {processedTransactions.length > 0 ? (
+          {transactionsLoading ? (
+            <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600">
+              <p className="text-sm font-semibold animate-pulse">Loading ledgers...</p>
+            </div>
+          ) : processedTransactions.length > 0 ? (
             <table className="w-full text-left min-w-[1000px]">
               <thead>
                 <tr className="bg-gray-100 dark:bg-[#0a0a0a] border-b border-gray-200 dark:border-[#262626]">
@@ -107,45 +132,58 @@ const Transactions = () => {
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Category</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Payment Source</th>
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-center">Amount</th>
-                  <th className="px-6 py-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Tagging</th>
-                  {role === 'Admin' && <th className="px-6 py-4"></th>}
+                  <th className="px-6 py-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Type</th>
+                  <th className="px-6 py-4"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 dark:divide-[#262626]">
                 {processedTransactions.map((tx) => {
                   const MerchIcon = iconMap[tx.icon] || ShoppingCart;
-                  const SourceIcon = iconMap[tx.sourceIcon] || CreditCard;
+                  const isPositive = tx.type === 'income';
+                  
                   return (
                     <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
                       <td className="px-6 py-5">
-                        <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{tx.date}</p>
-                        <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">{tx.time}</p>
+                        <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</p>
                       </td>
                       <td className="px-6 py-5 flex items-center space-x-4">
-                        <div className={`w-10 h-10 rounded-lg ${tx.iconBg.replace('bg-', 'bg-').concat(' dark:bg-[#262626] dark:opacity-80')} ${tx.iconColor} dark:text-gray-300 flex items-center justify-center shrink-0`}><MerchIcon className="w-5 h-5" /></div>
+                        <div className={`w-10 h-10 rounded-lg bg-gray-200 dark:bg-[#262626] text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0`}>
+                          <MerchIcon className="w-5 h-5" />
+                        </div>
                         <div>
-                          <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{tx.merchant}</p>
-                          <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">{tx.desc}</p>
+                          <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{tx.merchant || tx.name}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">{tx.notes}</p>
                         </div>
                       </td>
-                      <td className="px-6 py-5"><p className="text-[11px] font-medium text-gray-500 dark:text-[#a3a3a3] flex items-center">{tx.catMain} <ChevronRight className="w-3 h-3 mx-1 text-gray-300 dark:text-gray-600" /> <span className="text-[#0A3D8B] dark:text-gray-200 font-bold">{tx.catSub}</span></p></td>
+                      <td className="px-6 py-5">
+                        <p className="text-[11px] font-medium text-gray-500 dark:text-[#a3a3a3] flex items-center">
+                          {tx.category || 'General'} 
+                          {tx.subCategory && <><ChevronRight className="w-3 h-3 mx-1 text-gray-300 dark:text-gray-600" /> <span className="text-[#0A3D8B] dark:text-gray-200 font-bold">{tx.subCategory}</span></>}
+                        </p>
+                      </td>
                       <td className="px-6 py-5">
                         <div className="flex items-center space-x-3">
-                          <SourceIcon className="w-5 h-5 text-gray-400 dark:text-[#a3a3a3] shrink-0" />
-                          <div><p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{tx.source}</p><p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">• {tx.sourceLast}</p></div>
+                          <CreditCard className="w-5 h-5 text-gray-400 dark:text-[#a3a3a3] shrink-0" />
+                          <div>
+                            <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{tx.accountName || 'Cash'}</p>
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-5 text-center">
-                        <p className={`text-sm font-bold ${tx.amountType === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#0F172A] dark:text-gray-200'}`}>{tx.amount}</p>
-                        {tx.subAmount && <p className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mt-1">{tx.subAmount}</p>}
+                        <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#0F172A] dark:text-gray-200'}`}>
+                          {isPositive ? '+' : '-'}₹{tx.amount.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                        </p>
                       </td>
                       <td className="px-6 py-5">
-                        <div className="flex items-center space-x-2">
-                          {tx.tag1 && <span className={`text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider ${tx.tag1.color.includes('bg-') ? tx.tag1.color.replace('bg-[', 'bg-[').concat(' dark:bg-[#262626] dark:text-gray-300') : tx.tag1.color} ${!tx.tag1.active && 'bg-transparent dark:text-gray-500'}`}>{tx.tag1.label}</span>}
-                          {tx.tag2 && <span className={`text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider ${tx.tag2.color} ${!tx.tag2.active && 'bg-transparent dark:text-gray-500'}`}>{tx.tag2.label}</span>}
-                        </div>
+                        <span className={`text-[9px] font-bold px-2 py-1 rounded uppercase tracking-wider ${isPositive ? 'bg-emerald-100 text-emerald-700 dark:bg-[#262626] dark:text-emerald-400' : 'bg-gray-200 text-gray-700 dark:bg-[#262626] dark:text-gray-400'}`}>
+                          {tx.type}
+                        </span>
                       </td>
-                      {role === 'Admin' && <td className="px-6 py-5 text-right"><button className="text-gray-400 hover:text-gray-600 dark:hover:text-[#a3a3a3]"><MoreVertical className="w-5 h-5" /></button></td>}
+                      <td className="px-6 py-5 text-right">
+                        <button className="text-gray-400 hover:text-gray-600 dark:hover:text-[#a3a3a3]">
+                          <MoreVertical className="w-5 h-5" />
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -158,20 +196,7 @@ const Transactions = () => {
             </div>
           )}
         </div>
-
-        <div className="p-4 md:p-6 border-t border-gray-200 dark:border-[#262626] flex flex-col sm:flex-row justify-between items-center gap-4">
-          <p className="text-[11px] font-medium text-gray-500 dark:text-[#a3a3a3]">
-            Showing <span className="font-bold text-[#0F172A] dark:text-gray-200">{processedTransactions.length}</span> transactions
-          </p>
-          <div className="flex items-center space-x-1">
-            <button className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 dark:border-[#262626] text-gray-500 dark:text-[#a3a3a3] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"><ChevronLeft className="w-4 h-4" /></button>
-            <button className="w-8 h-8 flex items-center justify-center rounded bg-[#0A3D8B] dark:bg-[#262626] text-white dark:text-gray-200 text-xs font-bold shadow-sm border border-transparent dark:border-[#262626]">1</button>
-            <button className="w-8 h-8 flex items-center justify-center rounded border border-gray-200 dark:border-[#262626] text-gray-600 dark:text-[#a3a3a3] hover:bg-gray-100 dark:hover:bg-[#1a1a1a]"><ChevronRight className="w-4 h-4" /></button>
-          </div>
-        </div>
       </div>
-
-      <TransactionSheet isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </div>
   );
 };

@@ -1,43 +1,48 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ArrowRight } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
+import { useApi } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
 
 const TransactionSheet = ({ isOpen, onClose }) => {
-  const { addTransaction } = useFinance();
+  const api = useApi();
+  const { transactions, setTransactions } = useAppStore();
 
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     merchant: '',
     amount: '',
-    type: 'negative',
+    type: 'expense',
     category: 'Lifestyle',
     date: new Date().toISOString().split('T')[0]
   });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    const newTx = {
-      id: Date.now(),
-      date: new Date(formData.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      merchant: formData.merchant,
-      desc: 'Manual Entry',
-      catMain: formData.category,
-      catSub: 'General',
-      source: 'Manual Entry',
-      sourceLast: 'XXXX',
-      amount: formData.type === 'negative' ? `-₹${parseFloat(formData.amount).toFixed(2)}` : `+₹${parseFloat(formData.amount).toFixed(2)}`,
-      amountType: formData.type,
-      status: 'Cleared',
-      icon: 'ShoppingCart',
-      iconBg: 'bg-blue-100',
-      iconColor: 'text-blue-600',
-      sourceIcon: 'CreditCard'
-    };
+    setIsSubmitting(true);
+    
+    try {
+      // POST the real data to your Neon DB
+      const newTx = await api.createTransaction({
+        amount: parseFloat(formData.amount),
+        type: formData.type, // 'expense' or 'income'
+        merchant: formData.merchant,
+        category: formData.category,
+        date: new Date(formData.date).toISOString()
+      });
 
-    addTransaction(newTx);
-    setFormData({ merchant: '', amount: '', type: 'negative', category: 'Lifestyle', date: new Date().toISOString().split('T')[0] });
-    onClose();
+      // Update the frontend store instantly
+      setTransactions([newTx, ...transactions]);
+      
+      // Reset & Close
+      setFormData({ merchant: '', amount: '', type: 'expense', category: 'Lifestyle', date: new Date().toISOString().split('T')[0] });
+      onClose();
+    } catch (error) {
+      console.error("Failed to commit transaction:", error);
+      alert("Failed to save transaction. Check the console.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return createPortal(
@@ -61,7 +66,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
         <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
           <div>
             <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">New Record</h2>
-            <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Transaction Ledger</p>
+            <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Live Database Entry</p>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]">
             <X className="w-5 h-5" />
@@ -102,8 +107,8 @@ const TransactionSheet = ({ isOpen, onClose }) => {
                   onChange={(e) => setFormData({...formData, type: e.target.value})}
                   className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
                 >
-                  <option value="negative">Expense</option>
-                  <option value="positive">Income</option>
+                  <option value="expense">Expense</option>
+                  <option value="income">Income</option>
                 </select>
               </div>
             </div>
@@ -137,8 +142,13 @@ const TransactionSheet = ({ isOpen, onClose }) => {
         </div>
 
         <div className="p-6 border-t border-gray-200 dark:border-[#262626] bg-white dark:bg-[#0a0a0a]">
-          <button type="submit" form="tx-form" className="w-full flex items-center justify-center py-3.5 bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">
-            Commit to Ledger <ArrowRight className="w-4 h-4 ml-2" />
+          <button 
+            type="submit" 
+            form="tx-form" 
+            disabled={isSubmitting}
+            className="w-full flex items-center justify-center py-3.5 bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg disabled:opacity-50"
+          >
+            {isSubmitting ? 'Syncing...' : 'Commit to Ledger'} <ArrowRight className="w-4 h-4 ml-2" />
           </button>
         </div>
       </div>

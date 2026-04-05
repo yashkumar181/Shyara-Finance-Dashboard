@@ -1,0 +1,72 @@
+import { getDb } from "../../lib/db.js";
+import { requireAuth, handleOptions } from "../../lib/auth.js";
+
+export default async function handler(req, res) {
+  if (handleOptions(req, res)) return;
+  const auth = await requireAuth(req, res);
+  if (!auth) return;
+
+  const sql = getDb();
+  const uid = auth.dbUserId;
+
+  if (req.method === "GET") {
+    try {
+      const rows = await sql`
+        SELECT t.id, t.amount, t.type, t.category, t.sub_category, t.merchant, t.notes, t.transaction_date, t.payment_method, a.nickname AS account_name 
+        FROM transactions t 
+        LEFT JOIN accounts a ON t.account_id = a.id 
+        WHERE t.user_id = ${uid} 
+        ORDER BY t.transaction_date DESC
+      `;
+      
+      const formatted = rows.map(t => ({
+        id: t.id,
+        amount: parseFloat(t.amount),
+        type: t.type,
+        category: t.category,
+        subCategory: t.sub_category,
+        merchant: t.merchant,
+        notes: t.notes,
+        date: t.transaction_date,
+        accountName: t.account_name,
+        icon: t.type === "income" ? "Home" : t.category === "Food & Dining" ? "ShoppingCart" : t.category === "Entertainment" ? "Tv" : t.category === "Shopping" ? "Laptop" : "CreditCard",
+      }));
+
+      return res.status(200).json(formatted);
+    } catch (e) {
+      return res.status(500).json({ error: "Failed to fetch transactions" });
+    }
+  }
+
+  if (req.method === "POST") {
+    try {
+      const { accountId, amount, type, category, subCategory, merchant, notes, date, paymentMethod } = req.body;
+      const txDate = date ? new Date(date) : new Date();
+
+      const rows = await sql`
+        INSERT INTO transactions (user_id, account_id, amount, type, category, sub_category, merchant, notes, transaction_date, payment_method)
+        VALUES (${uid}, ${accountId || null}, ${amount}, ${type}, ${category}, ${subCategory || null}, ${merchant || null}, ${notes || null}, ${txDate}, ${paymentMethod || null})
+        RETURNING id, amount, type, category, merchant, transaction_date
+      `;
+      
+      const newTx = rows[0];
+      return res.status(201).json({
+          ...newTx, 
+          amount: parseFloat(newTx.amount), 
+          date: newTx.transaction_date,
+          icon: newTx.type === "income" ? "Home" : "CreditCard"
+      });
+    } catch (e) {
+      return res.status(500).json({ error: "Failed to create transaction" });
+    }
+  }
+
+  if (req.method === "DELETE") {
+    const id = req.query.id;
+    if (!id) return res.status(400).json({ error: "Missing ID" });
+    await sql`DELETE FROM transactions WHERE id = ${id} AND user_id = ${uid}`;
+    return res.status(200).json({ success: true });
+  }
+
+  res.status(405).json({ error: "Method not allowed" });
+}
