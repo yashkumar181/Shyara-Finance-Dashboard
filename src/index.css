@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* TELL TAILWIND V4 TO USE CLASS-BASED DARK MODE */
+@custom-variant dark (&:is(.dark *));
+
+/* Smooth transition for dark mode toggling */
+html, body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Ensure child elements transition smoothly */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 300ms;
+}
