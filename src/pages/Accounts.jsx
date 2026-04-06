@@ -1,11 +1,19 @@
-import React, { useEffect } from 'react';
-import { RefreshCw, Building2, Wallet, CreditCard } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import { RefreshCw, Building2, Wallet, CreditCard, Plus, X, FileText, CheckCircle2, Trash2 } from 'lucide-react';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
 const Accounts = () => {
   const api = useApi();
   const { accounts, setAccounts, setAccountsLoading } = useAppStore();
+
+  const [isReconciling, setIsReconciling] = useState(false);
+  const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
+  const [selectedAccountDetail, setSelectedAccountDetail] = useState(null);
+  const [showAuditLog, setShowAuditLog] = useState(false);
+
+  const [newAccountData, setNewAccountData] = useState({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
 
   useEffect(() => {
     const loadData = async () => {
@@ -19,8 +27,35 @@ const Accounts = () => {
         setAccountsLoading(false);
       }
     };
-    loadData();
-  }, [api, setAccounts, setAccountsLoading]);
+    if (accounts.length === 0) loadData();
+  }, [api, setAccounts, setAccountsLoading, accounts.length]);
+
+  const handleReconcile = () => {
+    setIsReconciling(true);
+    setTimeout(() => setIsReconciling(false), 1500);
+  };
+
+  const handleAddAccount = (e) => {
+    e.preventDefault();
+    const newAcc = {
+      id: Date.now().toString(),
+      account_type: newAccountData.type === 'credit' ? 'credit_card' : newAccountData.type,
+      nickname: newAccountData.name,
+      provider: newAccountData.subtitle,
+      balance: newAccountData.type !== 'credit' ? parseFloat(newAccountData.balance) || 0 : 0,
+      outstanding: newAccountData.type === 'credit' ? parseFloat(newAccountData.balance) || 0 : 0,
+      credit_limit: parseFloat(newAccountData.limit) || 0,
+      currency: 'INR'
+    };
+    
+    setAccounts([...accounts, newAcc]);
+    setIsAddAccountOpen(false);
+    setNewAccountData({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
+  };
+
+  const handleDeleteAccount = (id) => {
+    setAccounts(accounts.filter(a => a.id !== id));
+  };
 
   // Live Calculations
   const liquidAccounts = accounts.filter(a => a.account_type !== 'credit_card');
@@ -38,10 +73,15 @@ const Accounts = () => {
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Accounts & Cards</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Real-time consolidated view of your architectural capital.</p>
         </div>
-        <button className="flex items-center justify-center px-4 py-2 bg-[#0A3D8B] dark:blue-600 text-white rounded-lg text-sm font-semibold hover:bg-[#082f6b] dark:hover:bg-blue-500 transition-colors shadow-sm">
-          <RefreshCw className="w-4 h-4 mr-2" />
-          Account Reconciliation
-        </button>
+        <div className="flex space-x-3">
+          <button onClick={() => setIsAddAccountOpen(true)} className="flex items-center justify-center px-4 py-2 bg-[#F8F9FA] dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#1E1E1E] transition-colors shadow-sm whitespace-nowrap">
+            <Plus className="w-4 h-4 mr-2" /> Add Account
+          </button>
+          <button onClick={handleReconcile} disabled={isReconciling} className="flex items-center justify-center px-4 py-2 bg-[#0A3D8B] dark:bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-[#082f6b] dark:hover:bg-blue-500 transition-colors shadow-sm disabled:opacity-70 whitespace-nowrap">
+            <RefreshCw className={`w-4 h-4 mr-2 ${isReconciling ? 'animate-spin' : ''}`} />
+            {isReconciling ? 'Reconciling...' : 'Account Reconciliation'}
+          </button>
+        </div>
       </div>
 
       {/* LIVE SUMMARY METRICS */}
@@ -82,7 +122,7 @@ const Accounts = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {liquidAccounts.map((acc, i) => (
-                <div key={acc.id || i} className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-56">
+                <div key={acc.id || i} className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-56 animate-fade-slide-up">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center space-x-3">
                       <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${acc.account_type === 'wallet' ? 'bg-purple-50 dark:bg-[#262626] text-purple-600' : 'bg-blue-50 dark:bg-[#262626] text-blue-600'}`}>
@@ -101,7 +141,10 @@ const Accounts = () => {
                   </div>
                   <div className="flex justify-between items-end">
                     <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3]">Currency: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{acc.currency || 'INR'}</span></p>
-                    <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-wider hover:underline">DETAILS</button>
+                    <div className="flex items-center space-x-4">
+                      <button onClick={() => handleDeleteAccount(acc.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setSelectedAccountDetail(acc)} className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-wider hover:underline">DETAILS</button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -126,18 +169,23 @@ const Accounts = () => {
                 const utilization = Math.min(Math.round((outstanding / limit) * 100), 100);
 
                 return (
-                  <div key={card.id || i} className="bg-[#212735] dark:bg-[#1A1F2C] p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center text-white h-auto sm:h-40 relative overflow-hidden gap-6 border border-transparent dark:border-[#262626]">
+                  <div key={card.id || i} className="bg-[#212735] dark:bg-[#1A1F2C] p-6 rounded-2xl shadow-md flex flex-col sm:flex-row justify-between items-start sm:items-center text-white h-auto sm:h-40 relative overflow-hidden gap-6 border border-transparent dark:border-[#262626] animate-fade-slide-up">
                     <div className="absolute right-0 top-0 opacity-10 w-64 h-64 transform translate-x-1/4 -translate-y-1/4 pointer-events-none">
                       <CreditCard className="w-full h-full" />
                     </div>
-                    <div className="flex flex-col justify-between h-full z-10 w-full sm:w-auto">
+                    <div className="flex flex-col justify-between h-full z-10 w-full sm:w-auto flex-1">
                       <div className="flex items-center space-x-3 mb-6 sm:mb-4">
                         <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center shrink-0">
                           <CreditCard className="w-5 h-5 text-gray-300" />
                         </div>
-                        <div>
-                          <h4 className="text-sm font-bold text-white">{card.nickname || card.provider}</h4>
-                          <p className="text-[10px] text-gray-400 font-medium tracking-wide">Credit Card</p>
+                        <div className="flex-1 flex justify-between items-start pr-4">
+                          <div>
+                            <h4 className="text-sm font-bold text-white">{card.nickname || card.provider}</h4>
+                            <p className="text-[10px] text-gray-400 font-medium tracking-wide">Credit Card</p>
+                          </div>
+                          <button onClick={() => handleDeleteAccount(card.id)} className="text-gray-400 hover:text-red-400 transition-colors ml-4 pt-1">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                       <div className="flex space-x-8 sm:space-x-12">
@@ -171,7 +219,7 @@ const Accounts = () => {
           </div>
         </div>
 
-        {/* STATIC INSIGHTS COLUMN (UNTOUCHED) */}
+        {/* STATIC INSIGHTS COLUMN */}
         <div className="w-full lg:w-80 shrink-0 space-y-6">
           <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-8 rounded-2xl shadow-md text-white relative overflow-hidden h-72 flex flex-col justify-between border border-transparent dark:border-[#262626]">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
@@ -222,11 +270,11 @@ const Accounts = () => {
         </div>
       </div>
 
-      {/* STATIC RECENT CLEARING (UNTOUCHED) */}
+      {/* STATIC RECENT CLEARING SECTION */}
       <div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Recent Clearing</h2>
-          <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-widest hover:underline">VIEW AUDIT LOG</button>
+          <button onClick={() => setShowAuditLog(true)} className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-widest hover:underline">VIEW AUDIT LOG</button>
         </div>
         
         <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-x-auto">
@@ -286,6 +334,114 @@ const Accounts = () => {
           </table>
         </div>
       </div>
+
+      {/* --- MODALS PORTALS --- */}
+      
+      {isAddAccountOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddAccountOpen(false)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-md rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
+              <div>
+                <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">New Account / Card</h2>
+                <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Link an asset or liability</p>
+              </div>
+              <button onClick={() => setIsAddAccountOpen(false)} className="text-gray-400 hover:text-[#0F172A] dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+            </div>
+            <form onSubmit={handleAddAccount} className="p-6 space-y-5">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Account / Card Name</label>
+                <input required type="text" value={newAccountData.name} onChange={e => setNewAccountData({...newAccountData, name: e.target.value})} placeholder="e.g. Chase Sapphire, HDFC Saving" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Type</label>
+                  <select value={newAccountData.type} onChange={e => setNewAccountData({...newAccountData, type: e.target.value, balance: '', limit: ''})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500">
+                    <option value="bank">Bank Account</option>
+                    <option value="wallet">Digital Wallet</option>
+                    <option value="credit">Credit Card</option>
+                  </select>
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">{newAccountData.type === 'credit' ? 'Current Due (₹)' : 'Current Balance (₹)'}</label>
+                  <input required type="number" step="0.01" value={newAccountData.balance} onChange={e => setNewAccountData({...newAccountData, balance: e.target.value})} placeholder="0.00" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className={`${newAccountData.type === 'credit' ? 'col-span-1' : 'col-span-2'}`}>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Identifier / Subtitle</label>
+                  <input required type="text" value={newAccountData.subtitle} onChange={e => setNewAccountData({...newAccountData, subtitle: e.target.value})} placeholder="e.g. XXXX-1234 or UPI Link" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500" />
+                </div>
+                {newAccountData.type === 'credit' && (
+                  <div className="col-span-1">
+                    <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Credit Limit (₹)</label>
+                    <input required type="number" step="0.01" value={newAccountData.limit} onChange={e => setNewAccountData({...newAccountData, limit: e.target.value})} placeholder="0.00" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500" />
+                  </div>
+                )}
+              </div>
+              <button type="submit" className="w-full py-3.5 bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg mt-4">Save & Link Entity</button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {selectedAccountDetail && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedAccountDetail(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6">
+            <div className="flex justify-between items-start mb-6">
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${selectedAccountDetail.account_type === 'wallet' ? 'bg-purple-50 dark:bg-[#262626] text-purple-600' : 'bg-blue-50 dark:bg-[#262626] text-blue-600'}`}>
+                {selectedAccountDetail.account_type === 'wallet' ? <Wallet className="w-6 h-6" /> : <Building2 className="w-6 h-6" />}
+              </div>
+              <button onClick={() => setSelectedAccountDetail(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"><X className="w-5 h-5" /></button>
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">{selectedAccountDetail.nickname || selectedAccountDetail.provider}</h2>
+            <p className="text-xs text-gray-500 dark:text-[#a3a3a3] font-semibold tracking-wider mb-6">{selectedAccountDetail.account_type}</p>
+            <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-[#262626] mb-6">
+              <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Available Balance</p>
+              <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹{parseFloat(selectedAccountDetail.balance || 0).toLocaleString('en-IN', {minimumFractionDigits: 2})}</h3>
+            </div>
+            <button onClick={() => setSelectedAccountDetail(null)} className="w-full py-3 bg-gray-200 dark:bg-[#262626] hover:bg-gray-300 dark:hover:bg-[#333333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors">Close</button>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* RESTORED: Audit Log Modal */}
+      {showAuditLog && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAuditLog(false)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-lg rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
+              <div>
+                <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 flex items-center"><FileText className="w-5 h-5 mr-2 text-[#0A3D8B] dark:text-gray-400"/> System Audit Log</h2>
+              </div>
+              <button onClick={() => setShowAuditLog(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="p-6 space-y-4">
+              <div className="flex items-start gap-4">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Reconciliation Successful</p>
+                  <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">All 12 linked accounts synced. No discrepancies found.</p>
+                  <p className="text-[9px] text-gray-400 dark:text-[#666666] font-bold tracking-widest mt-1 uppercase">Today, 14:02 PM</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-4">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Credit Limit Update Detected</p>
+                  <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">Axis Privilege CC limit increased to ₹25,000.00.</p>
+                  <p className="text-[9px] text-gray-400 dark:text-[#666666] font-bold tracking-widest mt-1 uppercase">Yesterday, 09:15 AM</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };

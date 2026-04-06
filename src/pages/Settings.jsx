@@ -19,7 +19,7 @@ const Settings = () => {
                 <Users className="w-5 h-5 mr-2 text-[#0A3D8B] dark:text-gray-400" />
                 Profile
               </h2>
-              <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">Manage your identity and tax compliance details.</p>
+              <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">Manage your identity and financial details.</p>
             </div>
             <button className="text-xs font-bold text-[#0A3D8B] dark:text-gray-400 flex items-center hover:underline">
               Edit Profile <PenLine className="w-3 h-3 ml-1" />
@@ -29,7 +29,7 @@ const Settings = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <p className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">Full Name</p>
-              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Elena Khasanov</p>
+              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Yash Kumar</p>
             </div>
             <div>
               <p className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">PAN Number</p>
@@ -37,11 +37,11 @@ const Settings = () => {
             </div>
             <div>
               <p className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">Email Address</p>
-              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">elena.k@shyara.io</p>
+              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">yashkumar18ch@gmail.com</p>
             </div>
             <div>
               <p className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">Phone Number</p>
-              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">+91 98765 43210</p>
+              <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">+91 9827767252</p>
             </div>
           </div>
         </div>
@@ -169,7 +169,7 @@ const Settings = () => {
               <div className="flex items-center space-x-3">
                 <img src="https://ui-avatars.com/api/?name=Mark+Khasanov&background=121212&color=991B1B" alt="Mark" className="w-8 h-8 rounded-full" />
                 <div>
-                  <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">Mark Khasanov</p>
+                  <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">CS Chaudhary</p>
                   <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3]">Joint Member</p>
                 </div>
               </div>

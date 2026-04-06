@@ -22,10 +22,9 @@ const TransactionSheet = ({ isOpen, onClose }) => {
     setIsSubmitting(true);
     
     try {
-      // POST the real data to your Neon DB
       const newTx = await api.createTransaction({
         amount: parseFloat(formData.amount),
-        type: formData.type, // 'expense' or 'income'
+        type: formData.type, 
         merchant: formData.merchant,
         category: formData.category,
         date: new Date(formData.date).toISOString()
@@ -46,23 +45,10 @@ const TransactionSheet = ({ isOpen, onClose }) => {
   };
 
   return createPortal(
-    <div 
-      className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${
-        isOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible delay-300'
-      }`}
-    >
-      <div 
-        className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${
-          isOpen ? 'opacity-100' : 'opacity-0'
-        }`} 
-        onClick={onClose}
-      ></div>
+    <div className={`fixed inset-0 z-[100] overflow-hidden transition-all duration-300 ${isOpen ? 'pointer-events-auto visible' : 'pointer-events-none invisible delay-300'}`}>
+      <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ease-in-out ${isOpen ? 'opacity-100' : 'opacity-0'}`} onClick={onClose}></div>
       
-      <div 
-        className={`absolute inset-y-0 right-0 z-10 w-full max-w-md bg-[#F8F9FA] dark:bg-[#121212] border-l border-gray-200 dark:border-[#262626] shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${
-          isOpen ? 'translate-x-0' : 'translate-x-full'
-        }`}
-      >
+      <div className={`absolute inset-y-0 right-0 z-10 w-full max-w-md bg-[#F8F9FA] dark:bg-[#121212] border-l border-gray-200 dark:border-[#262626] shadow-2xl transform transition-transform duration-300 ease-in-out flex flex-col ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
         <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
           <div>
             <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">New Record</h2>
@@ -78,11 +64,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
             <div>
               <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Merchant / Entity</label>
               <input 
-                required
-                type="text" 
-                value={formData.merchant}
-                onChange={(e) => setFormData({...formData, merchant: e.target.value})}
-                placeholder="e.g. Apple Store, Uber" 
+                required type="text" value={formData.merchant} onChange={(e) => setFormData({...formData, merchant: e.target.value})} placeholder="e.g. Apple Store, Uber" 
                 className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
               />
             </div>
@@ -91,20 +73,14 @@ const TransactionSheet = ({ isOpen, onClose }) => {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Amount (₹)</label>
                 <input 
-                  required
-                  type="number" 
-                  step="0.01"
-                  value={formData.amount}
-                  onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                  placeholder="0.00" 
+                  required type="number" step="0.01" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} placeholder="0.00" 
                   className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
                 />
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Type</label>
                 <select 
-                  value={formData.type}
-                  onChange={(e) => setFormData({...formData, type: e.target.value})}
+                  value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})}
                   className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
                 >
                   <option value="expense">Expense</option>
@@ -118,8 +94,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
               <div className="grid grid-cols-2 gap-3">
                 {['Lifestyle', 'Housing', 'Income', 'Travel'].map((cat) => (
                   <div 
-                    key={cat}
-                    onClick={() => setFormData({...formData, category: cat})}
+                    key={cat} onClick={() => setFormData({...formData, category: cat})}
                     className={`cursor-pointer px-4 py-3 rounded-xl border text-center text-xs font-bold transition-all ${formData.category === cat ? 'bg-[#0A3D8B] dark:bg-gray-800 text-white border-transparent' : 'bg-white dark:bg-[#0a0a0a] text-gray-600 dark:text-[#a3a3a3] border-gray-200 dark:border-[#262626] hover:border-gray-300 dark:hover:border-gray-500'}`}
                   >
                     {cat}
@@ -131,10 +106,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
             <div>
               <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Transaction Date</label>
               <input 
-                required
-                type="date" 
-                value={formData.date}
-                onChange={(e) => setFormData({...formData, date: e.target.value})}
+                required type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
                 className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
               />
             </div>
@@ -143,9 +115,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
 
         <div className="p-6 border-t border-gray-200 dark:border-[#262626] bg-white dark:bg-[#0a0a0a]">
           <button 
-            type="submit" 
-            form="tx-form" 
-            disabled={isSubmitting}
+            type="submit" form="tx-form" disabled={isSubmitting}
             className="w-full flex items-center justify-center py-3.5 bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg disabled:opacity-50"
           >
             {isSubmitting ? 'Syncing...' : 'Commit to Ledger'} <ArrowRight className="w-4 h-4 ml-2" />

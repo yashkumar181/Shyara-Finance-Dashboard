@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Download, Plus, ChevronDown, MoreVertical, 
-  ChevronLeft, ChevronRight, Search, Laptop, Home, 
+  Download, ChevronDown, MoreVertical, 
+  ChevronRight, Search, Laptop, Home, 
   ShoppingCart, Tv, CreditCard
 } from 'lucide-react';
 import { useApi } from '../lib/api';
@@ -33,7 +33,7 @@ const Transactions = () => {
     fetchLedger();
   }, [api, setTransactions, setTransactionsLoading]);
 
-  // Filtering Logic mapping to backend schema
+  // Filtering & Sorting Logic
   let processedTransactions = transactions.filter((tx) => {
     const merchantName = tx.merchant || tx.name || "Unknown";
     const catMain = tx.category || "Uncategorized";
@@ -47,7 +47,6 @@ const Transactions = () => {
     return matchesSearch && matchesCategory && matchesAccount;
   });
 
-  // Sorting Logic (Backend sends pure numbers now, so this is much cleaner)
   processedTransactions = processedTransactions.sort((a, b) => {
     if (sortOrder === 'Amount (High to Low)') return b.amount - a.amount;
     if (sortOrder === 'Amount (Low to High)') return a.amount - b.amount;
@@ -98,7 +97,7 @@ const Transactions = () => {
             </div>
             <div className="relative">
               <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
-                <option>All Categories</option><option>Leisure</option><option>Travel</option><option>Personal</option>
+                <option>All Categories</option><option>Leisure</option><option>Travel</option><option>Personal</option><option>Housing</option>
               </select>
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none"><ChevronDown className="w-4 h-4 text-gray-500 dark:text-[#a3a3a3]" /></div>
             </div>
@@ -147,12 +146,12 @@ const Transactions = () => {
                         <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</p>
                       </td>
                       <td className="px-6 py-5 flex items-center space-x-4">
-                        <div className={`w-10 h-10 rounded-lg bg-gray-200 dark:bg-[#262626] text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0`}>
+                        <div className="w-10 h-10 rounded-lg bg-gray-200 dark:bg-[#262626] text-gray-600 dark:text-gray-300 flex items-center justify-center shrink-0">
                           <MerchIcon className="w-5 h-5" />
                         </div>
                         <div>
                           <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{tx.merchant || tx.name}</p>
-                          <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">{tx.notes}</p>
+                          <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">{tx.notes || 'No description'}</p>
                         </div>
                       </td>
                       <td className="px-6 py-5">
