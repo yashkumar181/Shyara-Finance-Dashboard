@@ -43,8 +43,8 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
               <div className="w-3 h-3 border-2 border-blue-400 dark:border-[#121212] rounded-sm transform rotate-45 transition-colors"></div>
             </div>
             <div>
-              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara Finance</h1>
-              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Live Command Center</p>
+              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara</h1>
+              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Financial Dashbaord</p>
             </div>
           </div>
           

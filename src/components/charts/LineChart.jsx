@@ -3,21 +3,25 @@ import React, { useState } from 'react';
 const LineChart = ({ data }) => {
   const [hoverPoint, setHoverPoint] = useState(null);
 
+  // Safely handle empty data
+  if (!data || data.length === 0) return <div className="min-h-[220px] flex items-center justify-center text-gray-400">No data available</div>;
+
   const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense))) * 1.1; 
   const svgWidth = 600;
   const svgHeight = 200;
-  const paddingLeft = 45; // Added padding for the Y-axis labels
+  const paddingLeft = 55; // Increased to prevent Y-axis overlap
+  const paddingRight = 20; // Added to prevent last label overflow
   
-  const xMap = (idx) => paddingLeft + (idx / (data.length - 1)) * (svgWidth - paddingLeft);
-  const yMap = (val) => svgHeight - (val / maxVal) * svgHeight;
+  const xMap = (idx) => paddingLeft + (idx / Math.max(1, data.length - 1)) * (svgWidth - paddingLeft - paddingRight);
+  const yMap = (val) => svgHeight - (val / (maxVal || 1)) * svgHeight;
   
   const pointsIncome = data.map((d, i) => `${xMap(i)},${yMap(d.income)}`).join(' ');
   const pointsExpense = data.map((d, i) => `${xMap(i)},${yMap(d.expense)}`).join(' ');
 
-  // Helper to format Y-axis numbers (e.g., 18400 -> $18.4k)
+  // Fix 1: Changed to Rupee symbol
   const formatYAxis = (val) => {
-    if (val === 0) return '$0';
-    return `$${(val / 1000).toFixed(1)}k`;
+    if (val === 0) return '₹0';
+    return `₹${(val / 1000).toFixed(1)}k`;
   };
 
   return (
@@ -33,7 +37,7 @@ const LineChart = ({ data }) => {
               <text x="0" y={yPos + 4} className="text-[10px] fill-gray-400 dark:fill-gray-500 font-medium">
                 {formatYAxis(valValue)}
               </text>
-              <line x1={paddingLeft} y1={yPos} x2={svgWidth} y2={yPos} stroke="currentColor" className="text-gray-100 dark:text-white/5" strokeWidth="1" />
+              <line x1={paddingLeft} y1={yPos} x2={svgWidth - paddingRight} y2={yPos} stroke="currentColor" className="text-gray-100 dark:text-white/5" strokeWidth="1" />
             </g>
           );
         })}
@@ -52,7 +56,7 @@ const LineChart = ({ data }) => {
         
         {/* Hover interaction zones */}
         {data.map((d, i) => {
-          const widthPerZone = (svgWidth - paddingLeft) / Math.max(1, data.length - 1);
+          const widthPerZone = (svgWidth - paddingLeft - paddingRight) / Math.max(1, data.length - 1);
           return <rect key={i} x={xMap(i) - widthPerZone / 2} y="0" width={widthPerZone} height={svgHeight} fill="transparent" className="cursor-crosshair" onMouseEnter={() => setHoverPoint({ index: i, ...d, x: xMap(i), yInc: yMap(d.income), yExp: yMap(d.expense) })} />;
         })}
         
@@ -66,19 +70,28 @@ const LineChart = ({ data }) => {
         )}
       </svg>
       
-      {/* X-Axis Labels (Mon, Tue, Jan, Feb) */}
-      <div className="absolute left-0 right-0 bottom-[-30px] flex justify-between px-[2%]">
-        {data.map((d, i) => (
-          <span key={i} className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest transform -translate-x-1/2" style={{ position: 'absolute', left: `${(xMap(i) / svgWidth) * 100}%` }}>{d.label}</span>
-        ))}
+      {/* X-Axis Labels */}
+      <div className="absolute left-0 right-0 bottom-[-30px] flex justify-between">
+        {data.map((d, i) => {
+          // Adjust label positioning to prevent overflowing the edges
+          let transform = 'translateX(-50%)';
+          if (i === 0) transform = 'translateX(0)';
+          if (i === data.length - 1) transform = 'translateX(-100%)';
+          
+          return (
+            <span key={i} className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest absolute" style={{ left: `${(xMap(i) / svgWidth) * 100}%`, transform }}>
+              {d.label}
+            </span>
+          )
+        })}
       </div>
 
       {/* Interactive Tooltip Pop-up */}
       {hoverPoint && (
         <div className="absolute bg-[#0F172A] dark:bg-[#121212] text-white p-3 rounded-xl shadow-2xl text-xs z-10 pointer-events-none transition-all duration-100 ease-out min-w-[120px] border dark:border-white/10" style={{ left: `${(hoverPoint.x / svgWidth) * 100}%`, top: `${Math.min(hoverPoint.yInc, hoverPoint.yExp) - 15}px`, transform: `translate(${hoverPoint.index === 0 ? '0%' : hoverPoint.index === data.length - 1 ? '-100%' : '-50%'}, -100%)` }}>
           <p className="font-bold mb-2 border-b border-gray-700 dark:border-gray-800 pb-2 text-[10px] uppercase tracking-widest text-gray-300 dark:text-gray-400">{hoverPoint.label}</p>
-          <div className="flex items-center justify-between space-x-4 mb-2"><span className="flex items-center text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></div>Income</span><span className="font-bold text-sm">${hoverPoint.income.toLocaleString()}</span></div>
-          <div className="flex items-center justify-between space-x-4"><span className="flex items-center text-red-400"><div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></div>Expense</span><span className="font-bold text-sm">${hoverPoint.expense.toLocaleString()}</span></div>
+          <div className="flex items-center justify-between space-x-4 mb-2"><span className="flex items-center text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></div>Income</span><span className="font-bold text-sm">₹{hoverPoint.income.toLocaleString()}</span></div>
+          <div className="flex items-center justify-between space-x-4"><span className="flex items-center text-red-400"><div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2"></div>Expense</span><span className="font-bold text-sm">₹{hoverPoint.expense.toLocaleString()}</span></div>
         </div>
       )}
     </div>

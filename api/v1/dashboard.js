@@ -14,14 +14,26 @@ export default async function handler(req, res) {
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
 
   try {
-    const [accountsRows, monthlySpentRow, totalBudgetRow, recentTxns, upcomingBills, wealthHistory, creditCards] = await Promise.all([
+    const [
+      accountsRows, 
+      monthlySpentRow, 
+      totalBudgetRow, 
+      recentTxns, 
+      wealthHistoryMonthly,
+      wealthHistoryWeekly,
+      wealthHistoryDaily,
+      topMerchants,
+      goalsRows // <-- New Goals Query
+    ] = await Promise.all([
       sql`SELECT id, nickname, account_type, balance, outstanding, credit_limit FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`,
       sql`SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND TO_CHAR(transaction_date, 'YYYY-MM') = ${currentMonth}`,
       sql`SELECT COALESCE(SUM(monthly_limit), 0) AS total FROM budgets WHERE user_id = ${uid} AND month_year = ${currentMonth}`,
-      sql`SELECT t.id, t.amount, t.type, t.category, t.sub_category, t.merchant, t.transaction_date, t.payment_method, a.nickname AS account_name FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} ORDER BY t.transaction_date DESC LIMIT 5`,
-      sql`SELECT s.service_name, s.amount, s.billing_day, a.nickname AS account_name FROM subscriptions s LEFT JOIN accounts a ON s.account_id = a.id WHERE s.user_id = ${uid} AND s.status = 'active' ORDER BY s.billing_day LIMIT 5`,
-      sql`SELECT TO_CHAR(transaction_date, 'Mon') AS month, TO_CHAR(transaction_date, 'YYYY-MM') AS month_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY month, month_key ORDER BY month_key ASC`,
-      sql`SELECT nickname, outstanding, credit_limit FROM accounts WHERE user_id = ${uid} AND account_type = 'credit_card' AND is_active = TRUE`,
+      sql`SELECT t.id, t.amount, t.type, t.category, t.sub_category, t.merchant, t.transaction_date, a.nickname AS account_name FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} ORDER BY t.transaction_date DESC LIMIT 5`,
+      sql`SELECT TO_CHAR(transaction_date, 'Mon') AS label, TO_CHAR(transaction_date, 'YYYY-MM') AS sort_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY label, sort_key ORDER BY sort_key ASC`,
+      sql`SELECT 'Week ' || TO_CHAR(transaction_date, 'W') AS label, TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') AS sort_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '4 weeks' GROUP BY label, sort_key ORDER BY sort_key ASC`,
+      sql`SELECT TO_CHAR(transaction_date, 'Dy') AS label, TO_CHAR(transaction_date, 'YYYY-MM-DD') AS sort_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '7 days' GROUP BY label, sort_key ORDER BY sort_key ASC`,
+      sql`SELECT merchant, SUM(amount) as total_spent, COUNT(*) as tx_count FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND merchant IS NOT NULL AND merchant != '' GROUP BY merchant ORDER BY total_spent DESC LIMIT 4`,
+      sql`SELECT id, name, icon, target_amount, current_amount, theme FROM goals WHERE user_id = ${uid} ORDER BY created_at ASC LIMIT 3`
     ]);
 
     let bankBalance = 0;
@@ -35,37 +47,66 @@ export default async function handler(req, res) {
       }
     }
 
-    const netWorth = bankBalance - creditDebt;
-    const monthlySpent = parseFloat(monthlySpentRow?.[0]?.total) || 0;
-    const monthlyBudget = parseFloat(totalBudgetRow?.[0]?.total) || 0;
-
-    const wealthChartData = wealthHistory.map((row) => ({
-      month: row.month,
+    const mapChartData = (data) => data.map(row => ({
+      label: row.label,
       income: parseFloat(row.income) || 0,
-      expenses: parseFloat(row.expenses) || 0,
-      net: (parseFloat(row.income) || 0) - (parseFloat(row.expenses) || 0),
+      expense: parseFloat(row.expenses) || 0
     }));
 
-    const transactions = recentTxns.map((t) => ({
-      id: t.id,
-      name: t.merchant || t.category || t.type,
-      category: t.sub_category || t.category || t.type,
-      amount: parseFloat(t.amount),
-      date: t.transaction_date,
-      type: t.type,
-      account: t.account_name,
-      icon: t.type === "income" ? "Home" : t.category === "Food & Dining" ? "ShoppingCart" : t.category === "Entertainment" ? "Tv" : t.category === "Shopping" ? "Laptop" : "CreditCard",
-    }));
+    const merchants = topMerchants.map((m, idx) => {
+      const colors = ['bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 'bg-purple-100 text-purple-700', 'bg-orange-100 text-orange-700'];
+      return {
+        id: idx,
+        name: m.merchant,
+        sub: `${m.tx_count} Transactions`,
+        amount: `₹${parseFloat(m.total_spent).toLocaleString('en-IN')}`,
+        freq: 'Total Spent',
+        initial: m.merchant.substring(0, 2).toUpperCase(),
+        bg: colors[idx % colors.length].split(' ')[0],
+        text: colors[idx % colors.length].split(' ')[1]
+      };
+    });
+
+    const goals = goalsRows.map(g => {
+      const current = parseFloat(g.current_amount) || 0;
+      const target = parseFloat(g.target_amount) || 1;
+      const progress = Math.min(Math.round((current / target) * 100), 100);
+      
+      return {
+        id: g.id,
+        name: g.name,
+        icon: g.icon,
+        current: current,
+        target: target,
+        progress: progress,
+        theme: g.theme
+      };
+    });
 
     res.status(200).json({
-      netWorth,
+      netWorth: bankBalance - creditDebt,
       bankBalance,
       creditDebt,
-      monthlySpent,
-      monthlyBudget,
-      spendingPercentage: monthlyBudget > 0 ? Math.round((monthlySpent / monthlyBudget) * 100) : 0,
-      transactions,
-      wealthHistory: wealthChartData,
+      monthlySpent: parseFloat(monthlySpentRow?.[0]?.total) || 0,
+      monthlyBudget: parseFloat(totalBudgetRow?.[0]?.total) || 0,
+      spendingPercentage: parseFloat(totalBudgetRow?.[0]?.total) > 0 ? Math.round((parseFloat(monthlySpentRow?.[0]?.total) / parseFloat(totalBudgetRow?.[0]?.total)) * 100) : 0,
+      transactions: recentTxns.map(t => ({
+        id: t.id,
+        name: t.merchant || t.category || t.type,
+        category: t.sub_category || t.category || t.type,
+        amount: parseFloat(t.amount),
+        date: t.transaction_date,
+        type: t.type,
+        account: t.account_name,
+        icon: t.type === "income" ? "Home" : "ShoppingCart",
+      })),
+      charts: {
+        monthly: mapChartData(wealthHistoryMonthly),
+        weekly: mapChartData(wealthHistoryWeekly),
+        daily: mapChartData(wealthHistoryDaily)
+      },
+      topMerchants: merchants,
+      goals: goals
     });
   } catch (error) {
     res.status(500).json({ error: "Failed to load dashboard data" });
