@@ -6,31 +6,31 @@ import { useAppStore } from '../store/useAppStore';
 
 const TransactionSheet = ({ isOpen, onClose }) => {
   const api = useApi();
-  const { transactions, setTransactions } = useAppStore();
+  const { transactions, setTransactions, setAccounts, setDashboard, setBudget } = useAppStore(); 
 
-  const [accounts, setAccounts] = useState([]);
+  const [accountsList, setAccountsList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     merchant: '',
+    notes: '', // <-- NEW: Added notes field
     amount: '',
     type: 'expense',
     category: 'Lifestyle',
-    accountId: '',
+    accountId: '', 
     date: new Date().toISOString().split('T')[0]
   });
 
-  // Fetch real accounts to link the transaction
   useEffect(() => {
     if (isOpen) {
       const fetchAccounts = async () => {
         try {
           const data = await api.getAccounts();
-          setAccounts(data || []);
+          setAccountsList(data || []);
           if (data && data.length > 0) {
             setFormData(prev => ({ ...prev, accountId: data[0].id.toString() }));
           }
         } catch (error) {
-          console.error("Failed to fetch accounts", error);
+          console.error(error);
         }
       };
       fetchAccounts();
@@ -40,10 +40,10 @@ const TransactionSheet = ({ isOpen, onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.accountId) {
-      alert("Please ensure you have an active account first.");
+      alert("Please select a valid Funding Source first.");
       return;
     }
-    
+
     setIsSubmitting(true);
     
     try {
@@ -51,16 +51,29 @@ const TransactionSheet = ({ isOpen, onClose }) => {
         amount: parseFloat(formData.amount),
         type: formData.type, 
         merchant: formData.merchant,
+        notes: formData.notes, // <-- NEW: Send notes to backend
         category: formData.category,
-        account_id: parseInt(formData.accountId),
+        account_id: parseInt(formData.accountId), 
         date: new Date(formData.date).toISOString()
       });
 
-      // Update the frontend store instantly
       setTransactions([newTx, ...transactions]);
       
-      // Reset & Close
-      setFormData({ merchant: '', amount: '', type: 'expense', category: 'Lifestyle', accountId: accounts[0]?.id || '', date: new Date().toISOString().split('T')[0] });
+      try {
+         const [freshAccounts, freshDashboard, freshBudget] = await Promise.all([
+           api.getAccounts(),
+           api.getDashboard(),
+           api.getBudget()
+         ]);
+         
+         if (freshAccounts) setAccounts(freshAccounts);
+         if (freshDashboard) setDashboard(freshDashboard);
+         if (freshBudget) setBudget(freshBudget);
+      } catch (syncErr) {
+         console.error("Background sync failed:", syncErr);
+      }
+
+      setFormData({ merchant: '', notes: '', amount: '', type: 'expense', category: 'Lifestyle', accountId: accountsList[0]?.id || '', date: new Date().toISOString().split('T')[0] });
       onClose();
     } catch (error) {
       console.error("Failed to commit transaction:", error);
@@ -87,12 +100,22 @@ const TransactionSheet = ({ isOpen, onClose }) => {
 
         <div className="flex-1 overflow-y-auto">
           <form id="tx-form" onSubmit={handleSubmit} className="p-6 space-y-6">
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Merchant / Entity</label>
-              <input 
-                required type="text" value={formData.merchant} onChange={(e) => setFormData({...formData, merchant: e.target.value})} placeholder="e.g. Apple Store, Uber" 
-                className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
-              />
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Merchant / Entity</label>
+                <input 
+                  required type="text" value={formData.merchant} onChange={(e) => setFormData({...formData, merchant: e.target.value})} placeholder="e.g. Apple Store" 
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
+                />
+              </div>
+              <div className="col-span-2 md:col-span-1">
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Description</label>
+                <input 
+                  type="text" value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} placeholder="e.g. Monthly bill" 
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -129,25 +152,26 @@ const TransactionSheet = ({ isOpen, onClose }) => {
               </div>
             </div>
 
-            {/* Added live database account selector matching your UI */}
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Funding Source</label>
-              <select 
-                required value={formData.accountId} onChange={(e) => setFormData({...formData, accountId: e.target.value})}
-                className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer"
-              >
-                {accounts.map(acc => (
-                  <option key={acc.id} value={acc.id}>{acc.nickname}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Transaction Date</label>
-              <input 
-                required type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
-                className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Funding Source</label>
+                <select 
+                  required value={formData.accountId} onChange={(e) => setFormData({...formData, accountId: e.target.value})}
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer"
+                >
+                  {accountsList.map(acc => (
+                    <option key={acc.id} value={acc.id}>{acc.nickname}</option>
+                  ))}
+                  {accountsList.length === 0 && <option value="" disabled>No accounts found</option>}
+                </select>
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Date</label>
+                <input 
+                  required type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})}
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
+                />
+              </div>
             </div>
           </form>
         </div>

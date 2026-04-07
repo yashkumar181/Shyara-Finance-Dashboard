@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Download, ChevronDown, MoreVertical, 
   ChevronRight, Search, Laptop, Home, 
-  ShoppingCart, Tv, CreditCard
+  ShoppingCart, Tv, CreditCard, Trash2
 } from 'lucide-react';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
@@ -14,16 +14,22 @@ const Transactions = () => {
   const { transactions, transactionsLoading, setTransactions, setTransactionsLoading } = useAppStore();
   
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('All Categories');
   const [accountFilter, setAccountFilter] = useState('All Accounts');
   const [sortOrder, setSortOrder] = useState('Date (Newest)');
+  
+  const [accountsList, setAccountsList] = useState([]);
+  const [openMenuId, setOpenMenuId] = useState(null); // Tracks which 3-dots menu is open
 
   useEffect(() => {
     const fetchLedger = async () => {
       setTransactionsLoading(true);
       try {
-        const data = await api.getTransactions();
-        setTransactions(data);
+        const [txData, accData] = await Promise.all([
+          api.getTransactions(),
+          api.getAccounts()
+        ]);
+        setTransactions(txData);
+        setAccountsList(accData || []);
       } catch (error) {
         console.error("Error fetching transactions:", error);
       } finally {
@@ -33,18 +39,29 @@ const Transactions = () => {
     fetchLedger();
   }, [api, setTransactions, setTransactionsLoading]);
 
+  // LIVE Delete Logic
+  const handleDeleteTransaction = async (id) => {
+    if (!window.confirm("Are you sure you want to permanently delete this transaction?")) return;
+    try {
+      await api.deleteTransaction(id);
+      setTransactions(transactions.filter(t => t.id !== id));
+      setOpenMenuId(null);
+    } catch (error) {
+      console.error("Error deleting transaction", error);
+      alert("Failed to delete transaction.");
+    }
+  };
+
   // Filtering & Sorting Logic
   let processedTransactions = transactions.filter((tx) => {
     const merchantName = tx.merchant || tx.name || "Unknown";
-    const catMain = tx.category || "Uncategorized";
     const source = tx.accountName || "Unknown";
     
     const matchesSearch = merchantName.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (tx.notes || "").toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesCategory = categoryFilter === 'All Categories' || catMain === categoryFilter;
     const matchesAccount = accountFilter === 'All Accounts' || source === accountFilter;
     
-    return matchesSearch && matchesCategory && matchesAccount;
+    return matchesSearch && matchesAccount;
   });
 
   processedTransactions = processedTransactions.sort((a, b) => {
@@ -55,13 +72,13 @@ const Transactions = () => {
   });
 
   const clearFilters = () => {
-    setSearchTerm(''); setCategoryFilter('All Categories'); setAccountFilter('All Accounts'); setSortOrder('Date (Newest)');
+    setSearchTerm(''); setAccountFilter('All Accounts'); setSortOrder('Date (Newest)');
   };
 
   const handleExportCSV = () => {
-    const headers = "Date,Merchant,Category,Account,Amount,Type\n";
+    const headers = "Date,Merchant,Description,Category,Account,Amount,Type\n";
     const csvRows = processedTransactions.map(tx => 
-      `"${new Date(tx.date).toLocaleDateString()}","${tx.merchant || tx.name}","${tx.category}","${tx.accountName}","${tx.amount}","${tx.type}"`
+      `"${new Date(tx.date).toLocaleDateString()}","${tx.merchant || tx.name}","${tx.notes || ''}","${tx.category}","${tx.accountName}","${tx.amount}","${tx.type}"`
     ).join("\n");
     
     const blob = new Blob([headers + csvRows], { type: 'text/csv' });
@@ -90,23 +107,24 @@ const Transactions = () => {
 
       <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden mb-8">
         <div className="p-4 md:p-6 flex flex-col xl:flex-row gap-4 border-b border-gray-200 dark:border-[#262626] items-start xl:items-center">
-          <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-4 w-full">
+          {/* Note: Grid changed to 4 columns since we removed Categories */}
+          <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
             <div className="relative md:col-span-2">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-[#a3a3a3]" />
-              <input type="text" placeholder="Search merchants..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm" />
+              <input type="text" placeholder="Search merchants or descriptions..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm" />
             </div>
-            <div className="relative">
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
-                <option>All Categories</option><option>Leisure</option><option>Travel</option><option>Personal</option><option>Housing</option>
-              </select>
-              <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none"><ChevronDown className="w-4 h-4 text-gray-500 dark:text-[#a3a3a3]" /></div>
-            </div>
+            
+            {/* Live Accounts Filter */}
             <div className="relative">
               <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
-                <option>All Accounts</option><option>Bank</option><option>Credit Card</option><option>Manual Entry</option>
+                <option value="All Accounts">All Accounts</option>
+                {accountsList.map(acc => (
+                  <option key={acc.id} value={acc.nickname}>{acc.nickname}</option>
+                ))}
               </select>
               <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none"><ChevronDown className="w-4 h-4 text-gray-500 dark:text-[#a3a3a3]" /></div>
             </div>
+
             <div className="relative">
               <select value={sortOrder} onChange={(e) => setSortOrder(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0A3D8B] dark:text-gray-200 text-xs font-bold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
                 <option>Date (Newest)</option><option>Date (Oldest)</option><option>Amount (High to Low)</option><option>Amount (Low to High)</option>
@@ -117,7 +135,7 @@ const Transactions = () => {
           <button onClick={clearFilters} className="text-[#0A3D8B] dark:text-[#a3a3a3] text-xs font-bold hover:underline px-2 whitespace-nowrap">Reset</button>
         </div>
 
-        <div className="overflow-x-auto min-h-[300px]">
+        <div className="overflow-x-auto min-h-[300px] pb-32">
           {transactionsLoading ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600">
               <p className="text-sm font-semibold animate-pulse">Loading ledgers...</p>
@@ -141,7 +159,7 @@ const Transactions = () => {
                   const isPositive = tx.type === 'income';
                   
                   return (
-                    <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
+                    <tr key={tx.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors relative">
                       <td className="px-6 py-5">
                         <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 whitespace-nowrap">{new Date(tx.date).toLocaleDateString()}</p>
                       </td>
@@ -178,10 +196,25 @@ const Transactions = () => {
                           {tx.type}
                         </span>
                       </td>
-                      <td className="px-6 py-5 text-right">
-                        <button className="text-gray-400 hover:text-gray-600 dark:hover:text-[#a3a3a3]">
+                      <td className="px-6 py-5 text-right relative">
+                        {/* 3-DOTS ACTION MENU */}
+                        <button 
+                          onClick={() => setOpenMenuId(openMenuId === tx.id ? null : tx.id)} 
+                          className="text-gray-400 hover:text-gray-600 dark:hover:text-[#a3a3a3] p-1 rounded hover:bg-gray-100 dark:hover:bg-[#262626]"
+                        >
                           <MoreVertical className="w-5 h-5" />
                         </button>
+
+                        {openMenuId === tx.id && (
+                          <div className="absolute right-8 top-10 mt-1 w-40 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-2 z-50 animate-fade-slide-up">
+                            <button 
+                              onClick={() => handleDeleteTransaction(tx.id)} 
+                              className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" /> Delete Entry
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   )
