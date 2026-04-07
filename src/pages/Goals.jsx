@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Target, Plus, Trash2, Award, History, X, ArrowRight, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { Target, Plus, Trash2, Award, History, X, ArrowRight, TrendingUp, CheckCircle2, Home } from 'lucide-react';
 import { useApi } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
+
+// Map string names to Lucide icons
+const iconMap = { Target, Home, Award, TrendingUp, CheckCircle2 }; 
 
 const Goals = () => {
   const api = useApi();
-  const [goals, setGoals] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { goals, setGoals, goalsLoading, setGoalsLoading } = useAppStore(); 
 
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
@@ -17,7 +20,9 @@ const Goals = () => {
   const [fundAmount, setFundAmount] = useState('');
 
   const loadGoals = async () => {
-    setIsLoading(true);
+    if (!useAppStore.getState().goals) {
+      setGoalsLoading(true);
+    }
     try {
       const data = await api.getGoals();
       setGoals(data.map(g => ({
@@ -27,17 +32,19 @@ const Goals = () => {
     } catch (error) {
       console.error(error);
     } finally {
-      setIsLoading(false);
+      setGoalsLoading(false);
     }
   };
 
   useEffect(() => {
     loadGoals();
-  }, [api]);
+  }, [api, setGoals, setGoalsLoading]);
 
-  const totalTarget = goals.reduce((sum, g) => sum + (parseFloat(g.target_amount) || 0), 0);
-  const totalSaved = goals.reduce((sum, g) => sum + (parseFloat(g.current_amount) || 0), 0);
-  const accomplishedCount = goals.filter(g => parseFloat(g.current_amount) >= parseFloat(g.target_amount)).length;
+  const safeGoals = goals || [];
+
+  const totalTarget = safeGoals.reduce((sum, g) => sum + (parseFloat(g.target_amount) || 0), 0);
+  const totalSaved = safeGoals.reduce((sum, g) => sum + (parseFloat(g.current_amount) || 0), 0);
+  const accomplishedCount = safeGoals.filter(g => parseFloat(g.current_amount) >= parseFloat(g.target_amount)).length;
 
   const handleAddGoal = async (e) => {
     e.preventDefault();
@@ -59,14 +66,14 @@ const Goals = () => {
   const handleDeleteGoal = async (id) => {
     try {
       await api.deleteGoal(id);
-      setGoals(goals.filter(g => g.id !== id));
+      setGoals(safeGoals.filter(g => g.id !== id));
     } catch (error) {
       console.error(error);
     }
   };
 
   const handlePriorityChange = async (id, newPriority) => {
-    setGoals(goals.map(g => g.id === id ? { ...g, priority: newPriority } : g));
+    setGoals(safeGoals.map(g => g.id === id ? { ...g, priority: newPriority } : g));
     try {
       await api.updateGoal({ id, priority: newPriority });
     } catch (error) {
@@ -84,7 +91,7 @@ const Goals = () => {
 
     try {
       await api.updateGoal({ id: selectedGoalForFunds.id, current_amount: newTotal });
-      setGoals(goals.map(g => {
+      setGoals(safeGoals.map(g => {
         if (g.id === selectedGoalForFunds.id) {
           return {
             ...g, 
@@ -133,11 +140,11 @@ const Goals = () => {
         </div>
       </div>
 
-      {isLoading ? (
+      {(goalsLoading && !goals) ? (
         <div className="py-20 text-center text-sm font-bold text-gray-400 uppercase tracking-widest animate-pulse">Syncing strategic targets...</div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-          {goals.map(goal => {
+          {safeGoals.map(goal => {
             const isComplete = parseFloat(goal.current_amount) >= parseFloat(goal.target_amount);
             const rawPercentage = (parseFloat(goal.current_amount) / parseFloat(goal.target_amount)) * 100;
             const percentage = Math.min(rawPercentage, 100).toFixed(1);
@@ -154,7 +161,7 @@ const Goals = () => {
             if (goal.priority === 'Medium') priorityClass = 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400';
 
             return (
-              <div key={goal.id} className={`p-6 md:p-8 rounded-2xl shadow-sm border transition-all animate-fade-slide-up flex flex-col justify-between ${isComplete ? 'bg-gradient-to-br from-[#FFFDF0] to-white dark:from-[#2A2410] dark:to-[#121212] border-yellow-300 dark:border-yellow-700/50' : 'bg-white dark:bg-[#121212] border-gray-200 dark:border-[#262626]'}`}>
+              <div key={goal.id} className={`p-6 md:p-8 rounded-2xl shadow-sm border transition-all flex flex-col justify-between ${isComplete ? 'bg-gradient-to-br from-[#FFFDF0] to-white dark:from-[#2A2410] dark:to-[#121212] border-yellow-300 dark:border-yellow-700/50' : 'bg-white dark:bg-[#121212] border-gray-200 dark:border-[#262626]'}`}>
                 <div>
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center space-x-4">
@@ -208,6 +215,12 @@ const Goals = () => {
               </div>
             )
           })}
+          
+          {safeGoals.length === 0 && (
+             <div className="col-span-2 text-center py-20 border-2 border-dashed border-gray-200 dark:border-[#262626] rounded-2xl text-gray-500">
+               No strategic goals set. Click "New Target" to begin planning.
+             </div>
+          )}
         </div>
       )}
 

@@ -15,19 +15,20 @@ const Accounts = () => {
 
   const [newAccountData, setNewAccountData] = useState({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
   
-  // Live states for tables
   const [recentClearing, setRecentClearing] = useState([]);
   const [accountTxns, setAccountTxns] = useState([]);
   const [loadingTxns, setLoadingTxns] = useState(false);
 
-  // Load Initial Data (Accounts & Global Recent Txns)
   useEffect(() => {
     const loadData = async () => {
-      setAccountsLoading(true);
+      // ONLY trigger loading screen if we have no cached accounts
+      if (useAppStore.getState().accounts.length === 0) {
+        setAccountsLoading(true);
+      }
       try {
         const [accData, txnsData] = await Promise.all([
           api.getAccounts(),
-          api.getTransactions({ limit: 4 }) // Fetch recent global clearing
+          api.getTransactions({ limit: 4 })
         ]);
         setAccounts(accData);
         setRecentClearing(Array.isArray(txnsData) ? txnsData : txnsData.transactions || []);
@@ -40,7 +41,6 @@ const Accounts = () => {
     loadData();
   }, [api, setAccounts, setAccountsLoading]);
 
-  // Fetch specific account transactions when Details modal opens
   useEffect(() => {
     if (selectedAccountDetail) {
       const fetchAccTxns = async () => {
@@ -65,11 +65,8 @@ const Accounts = () => {
     setTimeout(() => setIsReconciling(false), 1500);
   };
 
-  // LIVE: Add Account to Database
   const handleAddAccount = async (e) => {
     e.preventDefault();
-    
-    // Map UI selection to Database Schema Constraints
     let category = 'bank';
     let accType = 'savings';
 
@@ -93,7 +90,7 @@ const Accounts = () => {
     
     try {
       const addedAcc = await api.createAccount(payload);
-      setAccounts([addedAcc, ...accounts]);
+      setAccounts([addedAcc, ...useAppStore.getState().accounts]);
       setIsAddAccountOpen(false);
       setNewAccountData({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
     } catch (error) {
@@ -102,19 +99,17 @@ const Accounts = () => {
     }
   };
 
-  // LIVE: Delete Account from Database
   const handleDeleteAccount = async (id) => {
     if(!window.confirm("Are you sure you want to delete this account? All associated transactions will be removed.")) return;
     try {
       await api.deleteAccount(id);
-      setAccounts(accounts.filter(a => a.id !== id));
+      setAccounts(useAppStore.getState().accounts.filter(a => a.id !== id));
       if (selectedAccountDetail?.id === id) setSelectedAccountDetail(null);
     } catch (error) {
       console.error("Error deleting account:", error);
     }
   };
 
-  // Live Calculations
   const liquidAccounts = accounts.filter(a => a.account_type !== 'credit_card');
   const creditAccounts = accounts.filter(a => a.account_type === 'credit_card');
 
@@ -123,7 +118,6 @@ const Accounts = () => {
   const netWorth = totalAssets - totalLiabilities;
   const liquidityRatio = totalLiabilities > 0 ? (totalAssets / totalLiabilities).toFixed(2) : '∞';
 
-  // Dynamic colors for liability breakdown
   const liabilityColors = ['bg-blue-500', 'bg-orange-500', 'bg-purple-500', 'bg-red-500', 'bg-emerald-500'];
 
   return (
@@ -144,7 +138,6 @@ const Accounts = () => {
         </div>
       </div>
 
-      {/* LIVE SUMMARY METRICS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-2 uppercase">Net Worth</p>
@@ -172,7 +165,6 @@ const Accounts = () => {
 
       <div className="flex flex-col lg:flex-row gap-8 mb-8">
         <div className="flex-1 space-y-8">
-          {/* LIVE LIQUID ACCOUNTS */}
           <div>
             <div className="flex items-center justify-center mb-6">
               <div className="h-px bg-gray-200 dark:bg-[#262626] flex-1"></div>
@@ -214,7 +206,6 @@ const Accounts = () => {
             </div>
           </div>
 
-          {/* LIVE CREDIT CARDS */}
           <div>
             <div className="flex items-center justify-center mb-6">
               <div className="h-px bg-gray-200 dark:bg-[#262626] flex-1"></div>
@@ -279,7 +270,6 @@ const Accounts = () => {
           </div>
         </div>
 
-        {/* STATIC INSIGHTS & LIVE LIABILITY BREAKDOWN COLUMN */}
         <div className="w-full lg:w-80 shrink-0 space-y-6">
           <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-8 rounded-2xl shadow-md text-white relative overflow-hidden h-72 flex flex-col justify-between border border-transparent dark:border-[#262626]">
             <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle at 2px 2px, white 1px, transparent 0)', backgroundSize: '16px 16px' }}></div>
@@ -322,7 +312,6 @@ const Accounts = () => {
         </div>
       </div>
 
-      {/* LIVE RECENT CLEARING SECTION */}
       <div>
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Recent Clearing</h2>
@@ -373,9 +362,6 @@ const Accounts = () => {
         </div>
       </div>
 
-      {/* --- MODALS PORTALS --- */}
-      
-      {/* ADD ACCOUNT MODAL */}
       {isAddAccountOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddAccountOpen(false)}></div>
@@ -425,7 +411,6 @@ const Accounts = () => {
         document.body
       )}
 
-      {/* UPGRADED DETAILS MODAL WITH RECENT TRANSACTIONS */}
       {selectedAccountDetail && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedAccountDetail(null)}></div>
@@ -445,7 +430,6 @@ const Accounts = () => {
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
-              {/* Account Metrics */}
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white dark:bg-[#0a0a0a] p-5 rounded-xl border border-gray-200 dark:border-[#262626]">
                   <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">{selectedAccountDetail.account_type === 'credit_card' ? 'Outstanding Due' : 'Available Balance'}</p>
@@ -463,7 +447,6 @@ const Accounts = () => {
                 )}
               </div>
 
-              {/* Specific Recent Transactions */}
               <div>
                 <h3 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-4 flex items-center"><Activity className="w-4 h-4 mr-2 text-[#0A3D8B] dark:text-gray-400"/> Recent Activity (This Account)</h3>
                 
@@ -505,7 +488,6 @@ const Accounts = () => {
         document.body
       )}
 
-      {/* STATIC AUDIT LOG MODAL (Preserved from original) */}
       {showAuditLog && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAuditLog(false)}></div>

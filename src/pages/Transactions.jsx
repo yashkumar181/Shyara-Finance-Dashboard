@@ -18,11 +18,14 @@ const Transactions = () => {
   const [sortOrder, setSortOrder] = useState('Date (Newest)');
   
   const [accountsList, setAccountsList] = useState([]);
-  const [openMenuId, setOpenMenuId] = useState(null); // Tracks which 3-dots menu is open
+  const [openMenuId, setOpenMenuId] = useState(null);
 
   useEffect(() => {
     const fetchLedger = async () => {
-      setTransactionsLoading(true);
+      // ONLY trigger loading screen if we have no cached transactions
+      if (useAppStore.getState().transactions.length === 0) {
+        setTransactionsLoading(true);
+      }
       try {
         const [txData, accData] = await Promise.all([
           api.getTransactions(),
@@ -39,12 +42,11 @@ const Transactions = () => {
     fetchLedger();
   }, [api, setTransactions, setTransactionsLoading]);
 
-  // LIVE Delete Logic
   const handleDeleteTransaction = async (id) => {
     if (!window.confirm("Are you sure you want to permanently delete this transaction?")) return;
     try {
       await api.deleteTransaction(id);
-      setTransactions(transactions.filter(t => t.id !== id));
+      setTransactions(useAppStore.getState().transactions.filter(t => t.id !== id));
       setOpenMenuId(null);
     } catch (error) {
       console.error("Error deleting transaction", error);
@@ -52,7 +54,6 @@ const Transactions = () => {
     }
   };
 
-  // Filtering & Sorting Logic
   let processedTransactions = transactions.filter((tx) => {
     const merchantName = tx.merchant || tx.name || "Unknown";
     const source = tx.accountName || "Unknown";
@@ -107,14 +108,12 @@ const Transactions = () => {
 
       <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden mb-8">
         <div className="p-4 md:p-6 flex flex-col xl:flex-row gap-4 border-b border-gray-200 dark:border-[#262626] items-start xl:items-center">
-          {/* Note: Grid changed to 4 columns since we removed Categories */}
           <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
             <div className="relative md:col-span-2">
               <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 dark:text-[#a3a3a3]" />
               <input type="text" placeholder="Search merchants or descriptions..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-9 pr-4 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm" />
             </div>
             
-            {/* Live Accounts Filter */}
             <div className="relative">
               <select value={accountFilter} onChange={(e) => setAccountFilter(e.target.value)} className="w-full pl-4 pr-8 py-2.5 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-xs font-semibold rounded-lg appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 shadow-sm">
                 <option value="All Accounts">All Accounts</option>
@@ -136,7 +135,8 @@ const Transactions = () => {
         </div>
 
         <div className="overflow-x-auto min-h-[300px] pb-32">
-          {transactionsLoading ? (
+          {/* Changed condition to not block screen if data is already in Zustand */}
+          {(transactionsLoading && transactions.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600">
               <p className="text-sm font-semibold animate-pulse">Loading ledgers...</p>
             </div>
@@ -197,7 +197,6 @@ const Transactions = () => {
                         </span>
                       </td>
                       <td className="px-6 py-5 text-right relative">
-                        {/* 3-DOTS ACTION MENU */}
                         <button 
                           onClick={() => setOpenMenuId(openMenuId === tx.id ? null : tx.id)} 
                           className="text-gray-400 hover:text-gray-600 dark:hover:text-[#a3a3a3] p-1 rounded hover:bg-gray-100 dark:hover:bg-[#262626]"

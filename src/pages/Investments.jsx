@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { 
   TrendingUp, Wallet, Activity, PieChart, BarChart2, 
   ChevronDown, Filter, History, Lightbulb, Building2, 
@@ -6,15 +6,56 @@ import {
 } from 'lucide-react';
 import { investmentsData, portfolioPerformanceData } from '../data/mockData';
 import AreaChart from '../components/charts/AreaChart';
+import { useApi } from '../lib/api';
+import { useAppStore } from '../store/useAppStore';
 
 const Investments = () => {
+  const api = useApi();
+  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading } = useAppStore();
+
+  useEffect(() => {
+    const loadInvestments = async () => {
+      // Only block UI if we don't have cached data
+      if (!useAppStore.getState().investments) {
+        setInvestmentsLoading(true);
+      }
+      try {
+        // If the backend exists, fetch it. If not, this fails silently and we fall back to mock data.
+        if (api.getInvestments) {
+           const data = await api.getInvestments();
+           setInvestments(data);
+        }
+      } catch (err) {
+        console.error("Investment fetch failed (using fallback data)", err);
+      } finally {
+        setInvestmentsLoading(false);
+      }
+    };
+    loadInvestments();
+  }, [api, setInvestments, setInvestmentsLoading]);
+
+  // Only show loader on absolute cold boot
+  if (investmentsLoading && !investments) {
+    return (
+      <div className="flex-1 p-10 flex items-center justify-center min-h-[80vh]">
+        <div className="animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">
+          Syncing Portfolio...
+        </div>
+      </div>
+    );
+  }
+
+  // Gracefully fallback to mock data if backend isn't built yet
+  const safeTableData = investments?.assets || investmentsData;
+  const safeChartData = investments?.performance || portfolioPerformanceData;
+
   return (
     <div className="flex-1 overflow-auto p-4 md:p-10">
       
       <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Investment Portfolio</h1>
-          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across 12 active accounts</p>
+          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across active accounts</p>
         </div>
         <div className="flex space-x-3">
           <button className="flex items-center px-4 py-2 bg-[#F8F9FA] dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-[#1E1E1E] transition-colors shadow-sm">
@@ -68,7 +109,6 @@ const Investments = () => {
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         
-        {/* AREA CHART */}
         <div className="xl:col-span-2 bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -80,10 +120,9 @@ const Investments = () => {
               <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></div>CURRENT</div>
             </div>
           </div>
-          <AreaChart data={portfolioPerformanceData} />
+          <AreaChart data={safeChartData} />
         </div>
 
-        {/* PIE CHART */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
           <div className="flex justify-between items-center mb-8">
             <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Asset Allocation</h2>
@@ -219,7 +258,7 @@ const Investments = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-[#262626]">
-              {investmentsData.map((item) => {
+              {safeTableData.map((item) => {
                 const Icon = item.icon;
                 return (
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">

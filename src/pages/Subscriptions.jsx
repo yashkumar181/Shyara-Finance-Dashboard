@@ -8,31 +8,47 @@ import { useAppStore } from '../store/useAppStore';
 
 const Subscriptions = () => {
   const api = useApi();
-  const { subscriptions, setSubscriptions } = useAppStore();
+  const { subscriptions, setSubscriptions, subscriptionsLoading, setSubscriptionsLoading } = useAppStore();
   
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
   const [newSubData, setNewSubData] = useState({ service_name: '', amount: '', billing_day: '1', category: 'Entertainment' });
   const [isExporting, setIsExporting] = useState(false);
 
-  // Load Data
+  // Instant Load Pattern
   const loadSubs = async () => {
+    // Only block UI if we don't have cached data
+    if (!useAppStore.getState().subscriptions) {
+      setSubscriptionsLoading(true);
+    }
     try {
       const data = await api.getSubscriptions('active');
-      setSubscriptions(data);
+      setSubscriptions(data); // Silently updates in the background
     } catch (err) {
       console.error("Failed to load subscriptions", err);
+    } finally {
+      setSubscriptionsLoading(false);
     }
   };
 
   useEffect(() => {
     loadSubs();
-  }, [api, setSubscriptions]);
+  }, [api, setSubscriptions, setSubscriptionsLoading]);
+
+  // Loading Screen (Only triggers on cold boot)
+  if (subscriptionsLoading && !subscriptions) {
+    return (
+      <div className="flex-1 p-10 flex items-center justify-center min-h-[80vh]">
+        <div className="animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">
+          Syncing Active Services...
+        </div>
+      </div>
+    );
+  }
 
   const activeSubs = subscriptions?.subscriptions || [];
   const monthlyTotal = subscriptions?.summary?.monthlyTotal || 0;
   const yearlyForecast = monthlyTotal * 12;
 
-  // LIVE: Export Ledger to CSV
   const handleExportCSV = () => {
     if (!activeSubs.length) return alert("No active subscriptions to export.");
     setIsExporting(true);
@@ -60,7 +76,6 @@ const Subscriptions = () => {
     setIsExporting(false);
   };
 
-  // LIVE: Add Service
   const handleAddService = async (e) => {
     e.preventDefault();
     try {
@@ -70,7 +85,7 @@ const Subscriptions = () => {
         billing_day: parseInt(newSubData.billing_day),
         category: newSubData.category
       });
-      await loadSubs(); // Reload to get updated DB state
+      await loadSubs(); 
       setIsAddSubOpen(false);
       setNewSubData({ service_name: '', amount: '', billing_day: '1', category: 'Entertainment' });
     } catch (error) {
@@ -79,7 +94,6 @@ const Subscriptions = () => {
     }
   };
 
-  // LIVE: Delete Service
   const handleDeleteService = async (id) => {
     if (!window.confirm("Are you sure you want to cancel and track this subscription as deleted?")) return;
     try {
@@ -90,8 +104,6 @@ const Subscriptions = () => {
     }
   };
 
-  // LIVE BOTTOM METRICS CALCULATIONS
-  // 1. Cost By Category
   const categoryTotals = {};
   activeSubs.forEach(sub => {
     const cat = sub.category || 'General';
@@ -102,18 +114,14 @@ const Subscriptions = () => {
     name: cat,
     total: categoryTotals[cat],
     percentage: monthlyTotal > 0 ? (categoryTotals[cat] / monthlyTotal) * 100 : 0
-  })).sort((a, b) => b.total - a.total).slice(0, 3); // Get Top 3 Categories
+  })).sort((a, b) => b.total - a.total).slice(0, 3);
 
-  // 2. Average Daily Cost
   const averageDailyCost = (yearlyForecast / 365) || 0;
-
-  // 3. Potential Savings (Assuming a 5% optimization target based on total spend)
   const potentialSavings = yearlyForecast > 0 ? yearlyForecast * 0.05 : 0;
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-10">
       
-      {/* LIVE TOP METRICS */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         <div className="xl:col-span-2 bg-white dark:bg-[#1E1E1E] p-8 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 flex flex-col justify-between">
           <div>
@@ -136,7 +144,6 @@ const Subscriptions = () => {
           </div>
         </div>
 
-        {/* STATIC AUDIT SECTION */}
         <div className="bg-[#FFEFEA] dark:bg-[#2A1A15] p-8 rounded-2xl shadow-sm border border-orange-50 dark:border-orange-900/30">
           <div className="flex items-center space-x-3 mb-4">
             <div className="w-10 h-10 rounded-lg bg-[#3A2218] dark:bg-[#4A2511] flex items-center justify-center text-white">
@@ -180,7 +187,6 @@ const Subscriptions = () => {
           </div>
         </div>
 
-        {/* LIVE SUBSCRIPTION TABLE */}
         <div className="bg-white dark:bg-[#1E1E1E] rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 overflow-x-auto">
           <table className="w-full text-left min-w-[800px]">
             <thead>
@@ -240,7 +246,6 @@ const Subscriptions = () => {
         </div>
       </div>
 
-      {/* LIVE BOTTOM METRICS */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-[#F8FAFC] dark:bg-[#1E1E1E] p-6 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5">
           <p className="text-[10px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-6">Cost By Category (Live)</p>
@@ -275,7 +280,6 @@ const Subscriptions = () => {
         </div>
       </div>
 
-      {/* PORTAL: Add Subscription Modal */}
       {isAddSubOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddSubOpen(false)}></div>

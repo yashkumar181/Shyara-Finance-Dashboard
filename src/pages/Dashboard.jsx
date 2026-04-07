@@ -17,12 +17,14 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadDashboard = async () => {
-      setDashboardLoading(true);
+      if (!useAppStore.getState().dashboard) {
+        setDashboardLoading(true);
+      }
       try {
         const data = await api.getDashboard();
         setDashboard(data);
       } catch (error) {
-        console.error("Dashboard fetch error:", error);
+        console.error(error);
       } finally {
         setDashboardLoading(false);
       }
@@ -30,7 +32,7 @@ const Dashboard = () => {
     loadDashboard();
   }, [api, setDashboard, setDashboardLoading]);
 
-  if (dashboardLoading || !dashboard) {
+  if (!dashboard) {
     return (
       <div className="flex-1 p-10 flex items-center justify-center min-h-[80vh]">
         <div className="animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">
@@ -68,7 +70,7 @@ const Dashboard = () => {
   const dynamicChartData = dashboard.charts?.[chartTimeframe] || [];
 
   return (
-    <div className="p-4 md:p-10 relative">
+    <div className="flex-1 overflow-auto p-4 md:p-10 relative">
       <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Your Financial Overview</h1>
@@ -81,10 +83,8 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* ALL 4 METRIC CARDS RESTORED HERE */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
-        {/* Net Worth Card */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] transition-all">
           <div className="flex justify-between items-start mb-8">
             <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-[#262626] flex items-center justify-center text-blue-600 dark:text-gray-300 shrink-0"><Wallet className="w-5 h-5" /></div>
@@ -95,7 +95,6 @@ const Dashboard = () => {
           <div className="w-16 h-1 bg-[#0A3D8B] dark:bg-gray-400 rounded-full"></div>
         </div>
 
-        {/* Bank Balance Card */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] transition-all">
           <div className="flex justify-between items-start mb-8">
             <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-[#262626] flex items-center justify-center text-blue-600 dark:text-gray-300 shrink-0"><CreditCard className="w-5 h-5" /></div>
@@ -106,7 +105,6 @@ const Dashboard = () => {
           <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3] uppercase">{currentMetrics.cfDesc}</p>
         </div>
 
-        {/* Discretionary Remaining Card */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] transition-all">
           <div className="flex justify-between items-start mb-8">
             <div className="w-10 h-10 rounded-lg bg-blue-50 dark:bg-[#262626] flex items-center justify-center text-blue-600 dark:text-gray-300 shrink-0"><PiggyBank className="w-5 h-5" /></div>
@@ -117,7 +115,6 @@ const Dashboard = () => {
           <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3]">{currentMetrics.surDesc}</p>
         </div>
 
-        {/* Savings Rate Card */}
         <div className="bg-[#0A3D8B] dark:bg-gray-800 p-6 rounded-2xl shadow-md text-white border dark:border-[#262626] transition-all">
           <div className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center mb-8 shrink-0"><TrendingUp className="w-5 h-5 text-white" /></div>
           <p className="text-[10px] font-bold text-blue-200 dark:text-[#a3a3a3] tracking-wider mb-1 uppercase">Savings Rate</p>
@@ -185,8 +182,6 @@ const Dashboard = () => {
         </div>
 
         <div className="w-full xl:w-1/3 space-y-6">
-          
-          {/* LIVE GOALS SECTION */}
           <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
             <div className="flex justify-between items-center mb-6">
               <h3 className="text-[#0F172A] dark:text-gray-200 font-semibold text-base">Strategic Goals</h3>
@@ -197,7 +192,6 @@ const Dashboard = () => {
               <div className="space-y-6">
                 {dashboard.goals.map((goal) => {
                   const Icon = iconMap[goal.icon] || Target;
-                  // Handle dynamic theme colors
                   const iconColor = goal.theme === 'rose' ? 'text-rose-600' : 'text-[#0A3D8B]';
                   const barColor = goal.theme === 'rose' ? 'bg-rose-600 dark:bg-rose-500' : 'bg-[#0A3D8B] dark:bg-blue-500';
 

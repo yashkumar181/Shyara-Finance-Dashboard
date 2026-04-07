@@ -13,25 +13,27 @@ const Budget = () => {
   const [insightAvg, setInsightAvg] = useState(null);
   const [newConfig, setNewConfig] = useState({ category_name: '', monthly_limit: '', icon: 'PieChart', allow_rollover: false });
 
-  const loadData = async () => {
-    setBudgetLoading(true);
-    try {
-      const [budgetRes, txRes] = await Promise.all([
-        api.getBudget(),
-        api.getTransactions({ limit: 500 })
-      ]);
-      setBudget(budgetRes);
-      setTransactions(txRes.transactions || txRes || []);
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setBudgetLoading(false);
-    }
-  };
-
   useEffect(() => {
+    const loadData = async () => {
+      // ONLY trigger loading screen if we have no cached budget
+      if (!useAppStore.getState().budget) {
+        setBudgetLoading(true);
+      }
+      try {
+        const [budgetRes, txRes] = await Promise.all([
+          api.getBudget(),
+          api.getTransactions({ limit: 500 })
+        ]);
+        setBudget(budgetRes);
+        setTransactions(txRes.transactions || txRes || []);
+      } catch (error) {
+        console.error(error);
+      } finally {
+        setBudgetLoading(false);
+      }
+    };
     loadData();
-  }, [api]);
+  }, [api, setBudget, setTransactions, setBudgetLoading]);
 
   const handleCategoryNameChange = (val) => {
     setNewConfig({ ...newConfig, category_name: val });
@@ -59,7 +61,9 @@ const Budget = () => {
         icon: newConfig.icon,
         allow_rollover: newConfig.allow_rollover
       });
-      await loadData();
+      // Silent refresh
+      const freshBudget = await api.getBudget();
+      setBudget(freshBudget);
       setIsAddOpen(false);
       setNewConfig({ category_name: '', monthly_limit: '', icon: 'PieChart', allow_rollover: false });
       setInsightAvg(null);
@@ -71,7 +75,8 @@ const Budget = () => {
   const handleDelete = async (id) => {
     try {
       await api.deleteBudgetCategory(id);
-      await loadData();
+      const freshBudget = await api.getBudget();
+      setBudget(freshBudget);
     } catch (error) {
       console.error(error);
     }
@@ -81,14 +86,16 @@ const Budget = () => {
     alert(`Successfully swept ₹${budget.summary.totalRemaining.toLocaleString()} to Strategic Goals!`);
   };
 
-  if (budgetLoading || !budget) {
+  // Block the UI only if loading AND data is null
+  if (budgetLoading && !budget) {
     return <div className="flex-1 p-10 flex items-center justify-center animate-pulse text-gray-500 uppercase tracking-widest text-sm font-bold">Initializing Fiscal Engine...</div>;
   }
 
+  // Ensure budget exists before accessing
+  if (!budget) return null;
+
   const { summary, categories, daysLeft, daysPassed, daysInMonth } = budget;
   const spendProgress = summary.totalLimit > 0 ? (summary.totalSpent / summary.totalLimit) * 100 : 0;
-  
-  // Predictive Logic
   const isSurplus = summary.projectedSurplus >= 0;
 
   return (
@@ -103,7 +110,6 @@ const Budget = () => {
         </button>
       </div>
 
-      {/* --- SIMPLIFIED, HIGH-IMPACT MACRO CARDS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
