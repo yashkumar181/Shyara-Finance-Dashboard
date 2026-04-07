@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart, Download, PieChart } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import TransactionSheet from './TransactionSheet';
-
+import myLogo from '../assets/logo.jpg';
 const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const openTransactionSheet = useAppStore(state => state.openTransactionSheet);
   const isTransactionSheetOpen = useAppStore(state => state.isTransactionSheetOpen);
@@ -42,12 +42,10 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
       <div className={`fixed md:relative inset-y-0 left-0 z-50 w-64 bg-[#F8F9FA] dark:bg-[#0a0a0a] border-r border-gray-200 dark:border-[#262626] transform transition-transform duration-300 ease-in-out flex flex-col justify-between shrink-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0`}>
         <div>
           <div className="h-16 md:h-20 flex items-center px-6">
-            <div className="bg-[#0F172A] dark:bg-gray-200 w-8 h-8 rounded flex items-center justify-center mr-3 shrink-0 shadow-inner">
-              <div className="w-3 h-3 border-2 border-blue-400 dark:border-[#121212] rounded-sm transform rotate-45 transition-colors"></div>
-            </div>
+            <img src={myLogo} alt="My Logo" className="h-10 w-auto mr-3 object-contain rounded-md" />
             <div>
               <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara Finance</h1>
-              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Live Command Center</p>
+              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Personal Dashboard</p>
             </div>
           </div>
           
