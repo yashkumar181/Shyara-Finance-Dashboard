@@ -3,14 +3,13 @@ import React, { useState } from 'react';
 const LineChart = ({ data }) => {
   const [hoverPoint, setHoverPoint] = useState(null);
 
-  // Safely handle empty data
   if (!data || data.length === 0) return <div className="min-h-[220px] flex items-center justify-center text-gray-400">No data available</div>;
 
   const maxVal = Math.max(...data.map(d => Math.max(d.income, d.expense))) * 1.1; 
   const svgWidth = 600;
   const svgHeight = 200;
-  const paddingLeft = 55; // Increased to prevent Y-axis overlap
-  const paddingRight = 20; // Added to prevent last label overflow
+  const paddingLeft = 55; // Space for Y-Axis labels
+  const paddingRight = 10;
   
   const xMap = (idx) => paddingLeft + (idx / Math.max(1, data.length - 1)) * (svgWidth - paddingLeft - paddingRight);
   const yMap = (val) => svgHeight - (val / (maxVal || 1)) * svgHeight;
@@ -18,14 +17,13 @@ const LineChart = ({ data }) => {
   const pointsIncome = data.map((d, i) => `${xMap(i)},${yMap(d.income)}`).join(' ');
   const pointsExpense = data.map((d, i) => `${xMap(i)},${yMap(d.expense)}`).join(' ');
 
-  // Fix 1: Changed to Rupee symbol
   const formatYAxis = (val) => {
     if (val === 0) return '₹0';
     return `₹${(val / 1000).toFixed(1)}k`;
   };
 
   return (
-    <div className="flex-1 w-full relative min-h-[220px]" onMouseLeave={() => setHoverPoint(null)}>
+    <div className="flex-1 w-full relative min-h-[220px] pb-8" onMouseLeave={() => setHoverPoint(null)}>
       <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
         
         {/* Draw Y-Axis Grid Lines & Labels */}
@@ -42,7 +40,7 @@ const LineChart = ({ data }) => {
           );
         })}
 
-        {/* Draw Income (Green) & Expense (Red) Lines */}
+        {/* Draw Lines */}
         <polyline points={pointsIncome} fill="none" stroke="currentColor" className="text-emerald-500" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         <polyline points={pointsExpense} fill="none" stroke="currentColor" className="text-red-500" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
         
@@ -70,16 +68,20 @@ const LineChart = ({ data }) => {
         )}
       </svg>
       
-      {/* X-Axis Labels */}
-      <div className="absolute left-0 right-0 bottom-[-30px] flex justify-between">
+      {/* X-Axis Labels FIXED (Restricted inside bounds) */}
+      <div className="absolute left-0 right-0 bottom-0 h-8">
         {data.map((d, i) => {
-          // Adjust label positioning to prevent overflowing the edges
+          // Dynamic transform keeps edge labels firmly inside the box
           let transform = 'translateX(-50%)';
           if (i === 0) transform = 'translateX(0)';
           if (i === data.length - 1) transform = 'translateX(-100%)';
           
           return (
-            <span key={i} className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest absolute" style={{ left: `${(xMap(i) / svgWidth) * 100}%`, transform }}>
+            <span 
+              key={i} 
+              className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest absolute bottom-0" 
+              style={{ left: `${(xMap(i) / svgWidth) * 100}%`, transform }}
+            >
               {d.label}
             </span>
           )

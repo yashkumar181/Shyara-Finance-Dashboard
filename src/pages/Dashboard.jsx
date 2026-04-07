@@ -9,7 +9,7 @@ const iconMap = { Laptop, Home, ShoppingCart, Tv, CreditCard, GraduationCap, Tar
 
 const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('monthly');
-  const [chartTimeframe, setChartTimeframe] = useState('monthly');
+  const [chartTimeframe, setChartTimeframe] = useState('weekly');
   const navigate = useNavigate();
 
   const api = useApi();
