@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ArrowRight } from 'lucide-react';
 import { useApi } from '../lib/api';
@@ -8,17 +8,42 @@ const TransactionSheet = ({ isOpen, onClose }) => {
   const api = useApi();
   const { transactions, setTransactions } = useAppStore();
 
+  const [accounts, setAccounts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     merchant: '',
     amount: '',
     type: 'expense',
     category: 'Lifestyle',
+    accountId: '',
     date: new Date().toISOString().split('T')[0]
   });
 
+  // Fetch real accounts to link the transaction
+  useEffect(() => {
+    if (isOpen) {
+      const fetchAccounts = async () => {
+        try {
+          const data = await api.getAccounts();
+          setAccounts(data || []);
+          if (data && data.length > 0) {
+            setFormData(prev => ({ ...prev, accountId: data[0].id.toString() }));
+          }
+        } catch (error) {
+          console.error("Failed to fetch accounts", error);
+        }
+      };
+      fetchAccounts();
+    }
+  }, [isOpen, api]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!formData.accountId) {
+      alert("Please ensure you have an active account first.");
+      return;
+    }
+    
     setIsSubmitting(true);
     
     try {
@@ -27,6 +52,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
         type: formData.type, 
         merchant: formData.merchant,
         category: formData.category,
+        account_id: parseInt(formData.accountId),
         date: new Date(formData.date).toISOString()
       });
 
@@ -34,7 +60,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
       setTransactions([newTx, ...transactions]);
       
       // Reset & Close
-      setFormData({ merchant: '', amount: '', type: 'expense', category: 'Lifestyle', date: new Date().toISOString().split('T')[0] });
+      setFormData({ merchant: '', amount: '', type: 'expense', category: 'Lifestyle', accountId: accounts[0]?.id || '', date: new Date().toISOString().split('T')[0] });
       onClose();
     } catch (error) {
       console.error("Failed to commit transaction:", error);
@@ -81,7 +107,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Type</label>
                 <select 
                   value={formData.type} onChange={(e) => setFormData({...formData, type: e.target.value})}
-                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer"
                 >
                   <option value="expense">Expense</option>
                   <option value="income">Income</option>
@@ -101,6 +127,19 @@ const TransactionSheet = ({ isOpen, onClose }) => {
                   </div>
                 ))}
               </div>
+            </div>
+
+            {/* Added live database account selector matching your UI */}
+            <div>
+              <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Funding Source</label>
+              <select 
+                required value={formData.accountId} onChange={(e) => setFormData({...formData, accountId: e.target.value})}
+                className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer"
+              >
+                {accounts.map(acc => (
+                  <option key={acc.id} value={acc.id}>{acc.nickname}</option>
+                ))}
+              </select>
             </div>
 
             <div>

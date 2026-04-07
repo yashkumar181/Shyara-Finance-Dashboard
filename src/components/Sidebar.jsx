@@ -2,9 +2,12 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart, Download, PieChart } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
+import TransactionSheet from './TransactionSheet';
 
 const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const openTransactionSheet = useAppStore(state => state.openTransactionSheet);
+  const isTransactionSheetOpen = useAppStore(state => state.isTransactionSheetOpen);
+  const closeTransactionSheet = useAppStore(state => state.closeTransactionSheet);
   const user = useAppStore(state => state.user);
   
   // Pull live data for the exporter
@@ -43,8 +46,8 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
               <div className="w-3 h-3 border-2 border-blue-400 dark:border-[#121212] rounded-sm transform rotate-45 transition-colors"></div>
             </div>
             <div>
-              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara</h1>
-              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Financial Dashbaord</p>
+              <h1 className="text-[#0F172A] dark:text-gray-200 font-bold text-sm tracking-wide transition-colors">Shyara Finance</h1>
+              <p className="text-gray-400 dark:text-[#a3a3a3] text-[10px] tracking-widest uppercase">Live Command Center</p>
             </div>
           </div>
           
@@ -75,6 +78,8 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
           </button>
         </div>
       </div>
+
+      <TransactionSheet isOpen={isTransactionSheetOpen} onClose={closeTransactionSheet} />
     </>
   );
 };

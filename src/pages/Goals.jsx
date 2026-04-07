@@ -1,22 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Target, Plus, Trash2, Award, History, X, ArrowRight, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { useApi } from '../lib/api';
 
 const Goals = () => {
-  const [goals, setGoals] = useState([
-    {
-      id: 1, name: 'Modernist Retreat (House)', target: 20000000, current: 16400000, priority: 'High', deadline: '2027-12-01',
-      history: [{ id: 101, date: 'Oct 01, 2023', amount: 500000 }, { id: 102, date: 'Sep 01, 2023', amount: 450000 }]
-    },
-    {
-      id: 2, name: 'Emergency Fund', target: 500000, current: 500000, priority: 'High', deadline: '2023-12-31',
-      history: [{ id: 201, date: 'Jan 15, 2023', amount: 500000 }]
-    },
-    {
-      id: 3, name: 'Education Fund', target: 1250000, current: 425000, priority: 'Medium', deadline: '2030-06-01',
-      history: [{ id: 301, date: 'Oct 05, 2023', amount: 20000 }]
-    }
-  ]);
+  const api = useApi();
+  const [goals, setGoals] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const [isAddGoalOpen, setIsAddGoalOpen] = useState(false);
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
@@ -26,39 +16,89 @@ const Goals = () => {
   const [newGoal, setNewGoal] = useState({ name: '', target: '', priority: 'Medium', deadline: '' });
   const [fundAmount, setFundAmount] = useState('');
 
-  const totalTarget = goals.reduce((sum, g) => sum + g.target, 0);
-  const totalSaved = goals.reduce((sum, g) => sum + g.current, 0);
-  const accomplishedCount = goals.filter(g => g.current >= g.target).length;
-
-  const handleAddGoal = (e) => {
-    e.preventDefault();
-    const addedGoal = {
-      id: Date.now(), name: newGoal.name, target: parseFloat(newGoal.target), current: 0,
-      priority: newGoal.priority, deadline: newGoal.deadline, history: []
-    };
-    setGoals([addedGoal, ...goals]);
-    setIsAddGoalOpen(false);
-    setNewGoal({ name: '', target: '', priority: 'Medium', deadline: '' });
+  const loadGoals = async () => {
+    setIsLoading(true);
+    try {
+      const data = await api.getGoals();
+      setGoals(data.map(g => ({
+        ...g,
+        history: [] 
+      })));
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDeleteGoal = (id) => setGoals(goals.filter(g => g.id !== id));
+  useEffect(() => {
+    loadGoals();
+  }, [api]);
 
-  const handleAddFunds = (e) => {
+  const totalTarget = goals.reduce((sum, g) => sum + (parseFloat(g.target_amount) || 0), 0);
+  const totalSaved = goals.reduce((sum, g) => sum + (parseFloat(g.current_amount) || 0), 0);
+  const accomplishedCount = goals.filter(g => parseFloat(g.current_amount) >= parseFloat(g.target_amount)).length;
+
+  const handleAddGoal = async (e) => {
+    e.preventDefault();
+    try {
+      await api.createGoal({
+        name: newGoal.name,
+        target_amount: parseFloat(newGoal.target),
+        current_amount: 0,
+        priority: newGoal.priority,
+      });
+      await loadGoals();
+      setIsAddGoalOpen(false);
+      setNewGoal({ name: '', target: '', priority: 'Medium', deadline: '' });
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handleDeleteGoal = async (id) => {
+    try {
+      await api.deleteGoal(id);
+      setGoals(goals.filter(g => g.id !== id));
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  const handlePriorityChange = async (id, newPriority) => {
+    setGoals(goals.map(g => g.id === id ? { ...g, priority: newPriority } : g));
+    try {
+      await api.updateGoal({ id, priority: newPriority });
+    } catch (error) {
+      console.error(error);
+      loadGoals();
+    }
+  };
+
+  const handleAddFunds = async (e) => {
     e.preventDefault();
     const amount = parseFloat(fundAmount);
     if (!amount || amount <= 0) return;
 
-    setGoals(goals.map(g => {
-      if (g.id === selectedGoalForFunds.id) {
-        return {
-          ...g, current: Math.min(g.current + amount, g.target),
-          history: [{ id: Date.now(), date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }), amount }, ...g.history]
-        };
-      }
-      return g;
-    }));
-    setIsAddFundsOpen(false);
-    setFundAmount('');
+    const newTotal = parseFloat(selectedGoalForFunds.current_amount) + amount;
+
+    try {
+      await api.updateGoal({ id: selectedGoalForFunds.id, current_amount: newTotal });
+      setGoals(goals.map(g => {
+        if (g.id === selectedGoalForFunds.id) {
+          return {
+            ...g, 
+            current_amount: Math.min(newTotal, g.target_amount),
+            history: [{ id: Date.now(), date: new Date().toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' }), amount }, ...g.history]
+          };
+        }
+        return g;
+      }));
+      setIsAddFundsOpen(false);
+      setFundAmount('');
+    } catch (error) {
+      console.error(error);
+    }
   };
 
   return (
@@ -93,62 +133,83 @@ const Goals = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
-        {goals.map(goal => {
-          const isComplete = goal.current >= goal.target;
-          const percentage = Math.min((goal.current / goal.target) * 100, 100).toFixed(1);
-          
-          return (
-            <div key={goal.id} className={`p-6 md:p-8 rounded-2xl shadow-sm border transition-all animate-fade-slide-up flex flex-col justify-between ${isComplete ? 'bg-gradient-to-br from-[#FFFDF0] to-white dark:from-[#2A2410] dark:to-[#121212] border-yellow-300 dark:border-yellow-700/50' : 'bg-white dark:bg-[#121212] border-gray-200 dark:border-[#262626]'}`}>
-              <div>
-                <div className="flex justify-between items-start mb-6">
-                  <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${isComplete ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-500' : 'bg-gray-100 dark:bg-[#262626] text-[#0A3D8B] dark:text-gray-300'}`}>
-                      {isComplete ? <Award className="w-6 h-6" /> : <Target className="w-6 h-6" />}
-                    </div>
-                    <div>
-                      <h3 className={`text-lg font-bold ${isComplete ? 'text-yellow-800 dark:text-yellow-500' : 'text-[#0F172A] dark:text-gray-200'}`}>{goal.name}</h3>
-                      <div className="flex items-center mt-1 space-x-2">
-                        {isComplete ? (
-                          <span className="text-[9px] font-bold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-2 py-1 rounded uppercase tracking-widest flex items-center"><CheckCircle2 className="w-3 h-3 mr-1" /> ACHIEVED</span>
-                        ) : (
-                          <span className={`text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-transparent dark:border-[#262626] ${goal.priority === 'High' ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400' : goal.priority === 'Medium' ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400'}`}>
-                            {goal.priority} Priority
-                          </span>
-                        )}
-                        {!isComplete && <span className="text-[10px] text-gray-500 dark:text-[#a3a3a3] font-medium">Target: {goal.deadline}</span>}
+      {isLoading ? (
+        <div className="py-20 text-center text-sm font-bold text-gray-400 uppercase tracking-widest animate-pulse">Syncing strategic targets...</div>
+      ) : (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-8">
+          {goals.map(goal => {
+            const isComplete = parseFloat(goal.current_amount) >= parseFloat(goal.target_amount);
+            const rawPercentage = (parseFloat(goal.current_amount) / parseFloat(goal.target_amount)) * 100;
+            const percentage = Math.min(rawPercentage, 100).toFixed(1);
+            const numPercentage = parseFloat(percentage);
+
+            let progressColor = 'bg-[#0A3D8B] dark:bg-gray-500'; 
+            if (isComplete) progressColor = 'bg-yellow-500';
+            else if (numPercentage >= 80) progressColor = 'bg-emerald-500';
+            else if (numPercentage < 40) progressColor = 'bg-red-500';
+            else progressColor = 'bg-[#0A3D8B] dark:bg-blue-500'; 
+
+            let priorityClass = 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400';
+            if (goal.priority === 'High') priorityClass = 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400';
+            if (goal.priority === 'Medium') priorityClass = 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400';
+
+            return (
+              <div key={goal.id} className={`p-6 md:p-8 rounded-2xl shadow-sm border transition-all animate-fade-slide-up flex flex-col justify-between ${isComplete ? 'bg-gradient-to-br from-[#FFFDF0] to-white dark:from-[#2A2410] dark:to-[#121212] border-yellow-300 dark:border-yellow-700/50' : 'bg-white dark:bg-[#121212] border-gray-200 dark:border-[#262626]'}`}>
+                <div>
+                  <div className="flex justify-between items-start mb-6">
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-inner ${isComplete ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-500' : 'bg-gray-100 dark:bg-[#262626] text-[#0A3D8B] dark:text-gray-300'}`}>
+                        {isComplete ? <Award className="w-6 h-6" /> : <Target className="w-6 h-6" />}
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-bold ${isComplete ? 'text-yellow-800 dark:text-yellow-500' : 'text-[#0F172A] dark:text-gray-200'}`}>{goal.name}</h3>
+                        <div className="flex items-center mt-1 space-x-2">
+                          {isComplete ? (
+                            <span className="text-[9px] font-bold bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-500 px-2 py-1 rounded uppercase tracking-widest flex items-center"><CheckCircle2 className="w-3 h-3 mr-1" /> ACHIEVED</span>
+                          ) : (
+                            <select 
+                              value={goal.priority || 'Medium'}
+                              onChange={(e) => handlePriorityChange(goal.id, e.target.value)}
+                              className={`text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-transparent dark:border-[#262626] appearance-none cursor-pointer outline-none text-center ${priorityClass}`}
+                            >
+                              <option value="High">HIGH PRIORITY</option>
+                              <option value="Medium">MEDIUM PRIORITY</option>
+                              <option value="Low">LOW PRIORITY</option>
+                            </select>
+                          )}
+                        </div>
                       </div>
                     </div>
+                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-gray-400 hover:text-red-500 dark:text-[#a3a3a3] dark:hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#262626]"><Trash2 className="w-4 h-4" /></button>
                   </div>
-                  <button onClick={() => handleDeleteGoal(goal.id)} className="text-gray-400 hover:text-red-500 dark:text-[#a3a3a3] dark:hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#262626]"><Trash2 className="w-4 h-4" /></button>
+
+                  <div className="mb-8">
+                    <div className="flex justify-between items-end mb-2">
+                      <h2 className={`text-3xl font-bold ${isComplete ? 'text-yellow-700 dark:text-yellow-500' : 'text-[#0F172A] dark:text-gray-200'}`}>₹{parseFloat(goal.current_amount).toLocaleString('en-IN')}</h2>
+                      <p className={`text-[11px] font-bold uppercase tracking-widest ${isComplete ? 'text-yellow-600 dark:text-yellow-600/80' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>OF ₹{parseFloat(goal.target_amount).toLocaleString('en-IN')}</p>
+                    </div>
+                    <div className={`w-full h-3 rounded-full overflow-hidden ${isComplete ? 'bg-yellow-200 dark:bg-yellow-900/20' : 'bg-gray-100 dark:bg-[#0a0a0a]'}`}>
+                      <div className={`h-full rounded-full transition-all duration-1000 ${progressColor}`} style={{ width: `${percentage}%` }}></div>
+                    </div>
+                    <p className={`text-xs font-bold mt-2 ${isComplete ? 'text-yellow-700 dark:text-yellow-600' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>{percentage}% Funded</p>
+                  </div>
                 </div>
 
-                <div className="mb-8">
-                  <div className="flex justify-between items-end mb-2">
-                    <h2 className={`text-3xl font-bold ${isComplete ? 'text-yellow-700 dark:text-yellow-500' : 'text-[#0F172A] dark:text-gray-200'}`}>₹{goal.current.toLocaleString('en-IN')}</h2>
-                    <p className={`text-[11px] font-bold uppercase tracking-widest ${isComplete ? 'text-yellow-600 dark:text-yellow-600/80' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>OF ₹{goal.target.toLocaleString('en-IN')}</p>
-                  </div>
-                  <div className={`w-full h-3 rounded-full overflow-hidden ${isComplete ? 'bg-yellow-200 dark:bg-yellow-900/20' : 'bg-gray-100 dark:bg-[#0a0a0a]'}`}>
-                    <div className={`h-full rounded-full transition-all duration-1000 ${isComplete ? 'bg-yellow-500' : 'bg-[#0A3D8B] dark:bg-gray-500'}`} style={{ width: `${percentage}%` }}></div>
-                  </div>
-                  <p className={`text-xs font-bold mt-2 ${isComplete ? 'text-yellow-700 dark:text-yellow-600' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>{percentage}% Funded</p>
-                </div>
-              </div>
-
-              <div className="flex space-x-3 border-t border-gray-100 dark:border-[#262626] pt-4 mt-auto">
-                {!isComplete && (
-                  <button onClick={() => { setSelectedGoalForFunds(goal); setIsAddFundsOpen(true); }} className="flex-1 flex items-center justify-center py-2.5 bg-[#F0F5FF] dark:bg-[#1A2235] text-[#0A3D8B] dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-50 dark:hover:bg-[#202A40] transition-colors border border-transparent dark:border-[#262626]">
-                    <TrendingUp className="w-4 h-4 mr-2" /> Add Funds
+                <div className="flex space-x-3 border-t border-gray-100 dark:border-[#262626] pt-4 mt-auto">
+                  {!isComplete && (
+                    <button onClick={() => { setSelectedGoalForFunds(goal); setIsAddFundsOpen(true); }} className="flex-1 flex items-center justify-center py-2.5 bg-[#F0F5FF] dark:bg-[#1A2235] text-[#0A3D8B] dark:text-blue-400 rounded-lg text-xs font-bold hover:bg-blue-50 dark:hover:bg-[#202A40] transition-colors border border-transparent dark:border-[#262626]">
+                      <TrendingUp className="w-4 h-4 mr-2" /> Add Funds
+                    </button>
+                  )}
+                  <button onClick={() => setSelectedGoalDetails(goal)} className="flex-1 flex items-center justify-center py-2.5 bg-gray-50 dark:bg-[#121212] text-gray-600 dark:text-gray-300 rounded-lg text-xs font-bold hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors border border-gray-200 dark:border-[#262626]">
+                    <History className="w-4 h-4 mr-2" /> View Details
                   </button>
-                )}
-                <button onClick={() => setSelectedGoalDetails(goal)} className="flex-1 flex items-center justify-center py-2.5 bg-gray-50 dark:bg-[#121212] text-gray-600 dark:text-gray-300 rounded-lg text-xs font-bold hover:bg-gray-100 dark:hover:bg-[#1a1a1a] transition-colors border border-gray-200 dark:border-[#262626]">
-                  <History className="w-4 h-4 mr-2" /> View Details
-                </button>
+                </div>
               </div>
-            </div>
-          )
-        })}
-      </div>
+            )
+          })}
+        </div>
+      )}
 
       {isAddGoalOpen && createPortal(
         <div className="fixed inset-0 z-[100] overflow-hidden pointer-events-auto">
@@ -180,7 +241,7 @@ const Goals = () => {
                   </div>
                   <div>
                     <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Target Deadline</label>
-                    <input required type="date" value={newGoal.deadline} onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none dark:text-gray-200" />
+                    <input type="date" value={newGoal.deadline} onChange={(e) => setNewGoal({...newGoal, deadline: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none dark:text-gray-200" />
                   </div>
                 </div>
               </form>
@@ -233,15 +294,15 @@ const Goals = () => {
               <div className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-200 dark:border-[#262626] mb-6 flex justify-between items-center">
                 <div>
                   <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Current Balance</p>
-                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹{selectedGoalDetails.current.toLocaleString('en-IN')}</h3>
+                  <h3 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹{parseFloat(selectedGoalDetails.current_amount).toLocaleString('en-IN')}</h3>
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Target</p>
-                  <h3 className="text-lg font-bold text-gray-400 dark:text-gray-600">₹{selectedGoalDetails.target.toLocaleString('en-IN')}</h3>
+                  <h3 className="text-lg font-bold text-gray-400 dark:text-gray-600">₹{parseFloat(selectedGoalDetails.target_amount).toLocaleString('en-IN')}</h3>
                 </div>
               </div>
               <h4 className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-4">Past Contributions</h4>
-              {selectedGoalDetails.history.length > 0 ? (
+              {selectedGoalDetails.history && selectedGoalDetails.history.length > 0 ? (
                 <div className="space-y-3">
                   {selectedGoalDetails.history.map((entry, idx) => (
                     <div key={idx} className="flex justify-between items-center bg-gray-50 dark:bg-[#1a1a1a] p-3 rounded-lg border border-gray-100 dark:border-[#262626]">

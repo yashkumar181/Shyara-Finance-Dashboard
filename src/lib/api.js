@@ -55,6 +55,11 @@ export function createApiClient(getToken) {
     createHolding: (body) => post("/api/v1/investments", body),
     updateHolding: (id, body) => put(`/api/v1/investments?id=${id}`, body),
     deleteHolding: (id) => del(`/api/v1/investments?id=${id}`),
+    // --- GOALS ---
+    getGoals: () => get("/api/v1/goals"),
+    createGoal: (body) => post("/api/v1/goals", body),
+    updateGoal: (body) => put("/api/v1/goals", body),
+    deleteGoal: (id) => del(`/api/v1/goals?id=${id}`),
   };
 }
 
