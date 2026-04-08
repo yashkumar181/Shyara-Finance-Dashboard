@@ -1,9 +1,11 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { LayoutDashboard, CreditCard, ReceiptText, TrendingUp, RefreshCw, Target } from 'lucide-react';
+import { useAppStore } from '../store/useAppStore';
 
 const MobileNav = () => {
-  // Mapped exactly to Shyara's names and icons, excluding Settings
+  const { preferences } = useAppStore();
+
   const navItems = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/accounts', icon: CreditCard, label: 'Accounts' },
@@ -13,10 +15,17 @@ const MobileNav = () => {
     { to: '/goals', icon: Target, label: 'Goals' }
   ];
 
+  const visibleNavItems = navItems.filter(item => {
+    if (item.to === '/subscriptions') return preferences?.showSubscriptions !== false;
+    if (item.to === '/investments') return preferences?.showInvestments !== false;
+    if (item.to === '/goals') return preferences?.showGoals !== false;
+    return true;
+  });
+
   return (
     <div className="md:hidden fixed bottom-0 left-0 right-0 bg-[#F8F9FA] dark:bg-[#121212] border-t border-gray-200 dark:border-[#262626] z-50 px-1 shadow-[0_-4px_20px_rgba(0,0,0,0.05)] dark:shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
       <ul className="flex justify-between items-center h-16 pb-safe">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <li key={item.to} className="flex-1 min-w-0 h-full">
             <NavLink 
               to={item.to}

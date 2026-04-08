@@ -4,14 +4,14 @@ import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, P
 import { useAppStore } from '../store/useAppStore';
 import TransactionSheet from './TransactionSheet';
 import myLogo from '../assets/logo.jpg';
+
 const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
   const openTransactionSheet = useAppStore(state => state.openTransactionSheet);
   const isTransactionSheetOpen = useAppStore(state => state.isTransactionSheetOpen);
   const closeTransactionSheet = useAppStore(state => state.closeTransactionSheet);
   const user = useAppStore(state => state.user);
   
-  // Pull live data for the exporter
-  const { dashboard, transactions, accounts, budget, subscriptions, investments } = useAppStore(state => state);
+  const { dashboard, transactions, accounts, budget, subscriptions, investments, preferences } = useAppStore(state => state);
 
   const navLinkClass = ({ isActive }) => {
     const baseClass = "flex items-center px-4 py-3 rounded-lg font-medium text-xs tracking-wide border-l-4 transition-all duration-200 w-full text-left ";
@@ -53,10 +53,23 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/dashboard" className={navLinkClass}><LayoutDashboard className="w-4 h-4 mr-3 shrink-0" /> DASHBOARD</NavLink>
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/accounts" className={navLinkClass}><Landmark className="w-4 h-4 mr-3 shrink-0" /> ACCOUNTS</NavLink>
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/transactions" className={navLinkClass}><ReceiptText className="w-4 h-4 mr-3 shrink-0" /> TRANSACTIONS</NavLink>
-            <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/subscriptions" className={navLinkClass}><PlaySquare className="w-4 h-4 mr-3 shrink-0" /> SUBSCRIPTIONS</NavLink>
-            <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/investments" className={navLinkClass}><LineChart className="w-4 h-4 mr-3 shrink-0" /> INVESTMENTS</NavLink>
-            <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/budget" className={navLinkClass}><PieChart className="w-4 h-4 mr-3 shrink-0" /> BUDGET</NavLink>
-            <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/goals" className={navLinkClass}><Target className="w-4 h-4 mr-3 shrink-0" /> GOALS</NavLink>
+            
+            {preferences?.showSubscriptions !== false && (
+              <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/subscriptions" className={navLinkClass}><PlaySquare className="w-4 h-4 mr-3 shrink-0" /> SUBSCRIPTIONS</NavLink>
+            )}
+            
+            {preferences?.showInvestments !== false && (
+              <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/investments" className={navLinkClass}><LineChart className="w-4 h-4 mr-3 shrink-0" /> INVESTMENTS</NavLink>
+            )}
+            
+            {preferences?.showBudget !== false && (
+              <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/budget" className={navLinkClass}><PieChart className="w-4 h-4 mr-3 shrink-0" /> BUDGET</NavLink>
+            )}
+            
+            {preferences?.showGoals !== false && (
+              <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/goals" className={navLinkClass}><Target className="w-4 h-4 mr-3 shrink-0" /> GOALS</NavLink>
+            )}
+            
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/settings" className={navLinkClass}><Settings className="w-4 h-4 mr-3 shrink-0" /> SETTINGS</NavLink>
           </nav>
           
