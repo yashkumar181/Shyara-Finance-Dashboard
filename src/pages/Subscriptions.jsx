@@ -120,8 +120,7 @@ const Subscriptions = () => {
   const potentialSavings = yearlyForecast > 0 ? yearlyForecast * 0.05 : 0;
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-10">
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         <div className="xl:col-span-2 bg-white dark:bg-[#1E1E1E] p-8 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 flex flex-col justify-between">
           <div>
             <p className="text-xs font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-4">Total Monthly Burn</p>

@@ -95,8 +95,7 @@ const Transactions = () => {
   };
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-10 relative">
-      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
+<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Transactions</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Surgical overview of your fiscal movements.</p>

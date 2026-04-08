@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Bell, Search, Moon, Sun, Menu, LogOut } from 'lucide-react';
-import { useClerk, useUser } from '@clerk/clerk-react'; // <-- Imported useUser
+import { useClerk, useUser } from '@clerk/clerk-react';
+import logo from '../assets/logo.jpg'; 
 
 const Header = ({ setIsMobileMenuOpen }) => {
   const { signOut } = useClerk();
-  const { user } = useUser(); // <-- Pulling user directly from Clerk!
+  const { user } = useUser();
   
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
@@ -31,7 +32,6 @@ const Header = ({ setIsMobileMenuOpen }) => {
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }));
   };
 
-  // Safely extract name and email from Clerk's user object
   const displayName = user?.fullName || user?.firstName || 'Premium Member';
   const displayEmail = user?.primaryEmailAddress?.emailAddress || 'Active Account';
   const photoURL = user?.imageUrl || `https://ui-avatars.com/api/?name=${displayName}&background=0A3D8B&color=fff&bold=true`;
@@ -39,9 +39,16 @@ const Header = ({ setIsMobileMenuOpen }) => {
   return (
     <header className="h-16 md:h-20 bg-[#F8F9FA] dark:bg-[#121212] flex items-center justify-between px-4 md:px-10 border-b border-gray-200 dark:border-[#262626] shrink-0 transition-colors relative z-40">
       <div className="flex items-center space-x-4 md:space-x-8 flex-1">
-        <button onClick={() => setIsMobileMenuOpen(true)} className="md:hidden text-gray-400 hover:text-gray-600 dark:text-[#a3a3a3] dark:hover:text-gray-200 p-1 -ml-2 rounded-md transition-colors">
-          <Menu className="w-6 h-6" />
-        </button>
+        
+        <div className="flex items-center md:hidden">
+          <button onClick={() => setIsMobileMenuOpen(true)} className="text-gray-400 hover:text-gray-600 dark:text-[#a3a3a3] dark:hover:text-gray-200 p-1 -ml-2 rounded-md transition-colors mr-3">
+            <Menu className="w-6 h-6" />
+          </button>
+          <div className="flex items-center space-x-2">
+            <img src={logo} alt="Shyara" className="w-6 h-6 object-contain" />
+            <span className="font-bold text-[#0F172A] dark:text-white text-lg tracking-tight">Shyara Finance</span>
+          </div>
+        </div>
 
         <div className="hidden sm:block relative w-full max-w-sm cursor-pointer" onClick={openCommandMenu}>
           <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-[#a3a3a3]" />
@@ -58,7 +65,6 @@ const Header = ({ setIsMobileMenuOpen }) => {
           {isDarkMode ? <Sun className="w-5 h-5 text-yellow-400" /> : <Moon className="w-5 h-5" />}
         </button>
         
-        {/* Notifications */}
         <div className="relative">
           <button onClick={() => {setIsNotifOpen(!isNotifOpen); setIsProfileOpen(false);}} className="text-gray-400 dark:text-[#a3a3a3] hover:text-[#0F172A] dark:hover:text-white relative p-2 rounded-full hover:bg-gray-200 dark:hover:bg-[#262626] transition-all hidden sm:block">
             <Bell className="w-5 h-5" />
@@ -74,7 +80,6 @@ const Header = ({ setIsMobileMenuOpen }) => {
           )}
         </div>
         
-        {/* Profile */}
         <div className="relative">
           <div 
             onClick={() => {setIsProfileOpen(!isProfileOpen); setIsNotifOpen(false);}}

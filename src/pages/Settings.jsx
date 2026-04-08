@@ -3,8 +3,7 @@ import { PenLine, Target, Banknote, Plus, Landmark, CreditCard, Wallet, Bot, Use
 
 const Settings = () => {
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-10">
-      
+<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Settings</h1>
         <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Architect your financial environment and data privacy.</p>
