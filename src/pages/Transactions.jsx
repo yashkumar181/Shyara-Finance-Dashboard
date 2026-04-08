@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Download, ChevronDown, MoreVertical, 
   ChevronRight, Search, Laptop, Home, 
-  ShoppingCart, Tv, CreditCard, Trash2
+  ShoppingCart, Tv, CreditCard, Trash2, AlertTriangle
 } from 'lucide-react';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
@@ -19,10 +20,10 @@ const Transactions = () => {
   
   const [accountsList, setAccountsList] = useState([]);
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [transactionToDelete, setTransactionToDelete] = useState(null); // LIVE Modal State
 
   useEffect(() => {
     const fetchLedger = async () => {
-      // ONLY trigger loading screen if we have no cached transactions
       if (useAppStore.getState().transactions.length === 0) {
         setTransactionsLoading(true);
       }
@@ -42,12 +43,14 @@ const Transactions = () => {
     fetchLedger();
   }, [api, setTransactions, setTransactionsLoading]);
 
-  const handleDeleteTransaction = async (id) => {
-    if (!window.confirm("Are you sure you want to permanently delete this transaction?")) return;
+  // LIVE Custom Delete Logic
+  const confirmDeleteTransaction = async () => {
+    if (!transactionToDelete) return;
     try {
-      await api.deleteTransaction(id);
-      setTransactions(useAppStore.getState().transactions.filter(t => t.id !== id));
+      await api.deleteTransaction(transactionToDelete);
+      setTransactions(useAppStore.getState().transactions.filter(t => t.id !== transactionToDelete));
       setOpenMenuId(null);
+      setTransactionToDelete(null);
     } catch (error) {
       console.error("Error deleting transaction", error);
       alert("Failed to delete transaction.");
@@ -135,7 +138,6 @@ const Transactions = () => {
         </div>
 
         <div className="overflow-x-auto min-h-[300px] pb-32">
-          {/* Changed condition to not block screen if data is already in Zustand */}
           {(transactionsLoading && transactions.length === 0) ? (
             <div className="flex flex-col items-center justify-center h-48 text-gray-400 dark:text-gray-600">
               <p className="text-sm font-semibold animate-pulse">Loading ledgers...</p>
@@ -207,7 +209,7 @@ const Transactions = () => {
                         {openMenuId === tx.id && (
                           <div className="absolute right-8 top-10 mt-1 w-40 bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#333] rounded-xl shadow-xl py-2 z-50 animate-fade-slide-up">
                             <button 
-                              onClick={() => handleDeleteTransaction(tx.id)} 
+                              onClick={() => { setTransactionToDelete(tx.id); setOpenMenuId(null); }} 
                               className="w-full text-left px-4 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center transition-colors"
                             >
                               <Trash2 className="w-4 h-4 mr-2" /> Delete Entry
@@ -228,6 +230,25 @@ const Transactions = () => {
           )}
         </div>
       </div>
+
+      {/* CONFIRMATION MODAL */}
+      {transactionToDelete && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setTransactionToDelete(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
+            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Delete Transaction?</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to permanently delete this transaction? This action cannot be undone.</p>
+            <div className="flex space-x-3">
+              <button onClick={() => setTransactionToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
+              <button onClick={confirmDeleteTransaction} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Delete</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

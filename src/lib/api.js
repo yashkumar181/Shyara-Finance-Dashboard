@@ -59,7 +59,13 @@ export function createApiClient(getToken) {
     getGoals: () => get("/api/v1/goals"),
     createGoal: (body) => post("/api/v1/goals", body),
     updateGoal: (body) => put("/api/v1/goals", body),
+    
     deleteGoal: (id) => del(`/api/v1/goals?id=${id}`),
+    getInvestments: () => get("/api/v1/investments"),
+    createInvestment: (body) => post("/api/v1/investments", body),
+    deleteInvestment: (id) => del(`/api/v1/investments?id=${id}`),
+    syncInvestments: () => post("/api/v1/investments?action=sync"),
+  
   };
 }
 

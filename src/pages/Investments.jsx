@@ -1,68 +1,118 @@
-import React, { useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { 
-  TrendingUp, Wallet, Activity, PieChart, BarChart2, 
-  ChevronDown, Filter, History, Lightbulb, Building2, 
-  BarChart3, Landmark, MoreHorizontal
+  TrendingUp, Wallet, Activity, PieChart, ChevronDown, Filter, 
+  History, Lightbulb, Building2, Landmark, MoreHorizontal, Plus, 
+  RefreshCw, X, Trash2, AlertTriangle
 } from 'lucide-react';
-import { investmentsData, portfolioPerformanceData } from '../data/mockData';
 import AreaChart from '../components/charts/AreaChart';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
 const Investments = () => {
   const api = useApi();
-  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading } = useAppStore();
+  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading, setDashboard } = useAppStore();
+  
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState(null);
+  
+  const [newAsset, setNewAsset] = useState({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
 
-  useEffect(() => {
-    const loadInvestments = async () => {
-      // Only block UI if we don't have cached data
-      if (!useAppStore.getState().investments) {
-        setInvestmentsLoading(true);
-      }
-      try {
-        // If the backend exists, fetch it. If not, this fails silently and we fall back to mock data.
-        if (api.getInvestments) {
-           const data = await api.getInvestments();
-           setInvestments(data);
-        }
-      } catch (err) {
-        console.error("Investment fetch failed (using fallback data)", err);
-      } finally {
-        setInvestmentsLoading(false);
-      }
-    };
-    loadInvestments();
-  }, [api, setInvestments, setInvestmentsLoading]);
+  const loadInvestments = async () => {
+    if (!useAppStore.getState().investments) setInvestmentsLoading(true);
+    try {
+      const data = await api.getInvestments();
+      setInvestments(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setInvestments([]);
+    } finally {
+      setInvestmentsLoading(false);
+    }
+  };
 
-  // Only show loader on absolute cold boot
+  useEffect(() => { loadInvestments(); }, [api, setInvestments, setInvestmentsLoading]);
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const updatedData = await api.syncInvestments();
+      if (updatedData && updatedData.error) {
+         alert("Market Sync Failed: " + updatedData.error);
+      } else {
+         setInvestments(Array.isArray(updatedData) ? updatedData : []);
+         const freshDashboard = await api.getDashboard();
+         if (freshDashboard) setDashboard(freshDashboard);
+      }
+    } catch (err) {
+      alert("Network error: Failed to reach market data servers.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleAddAsset = async (e) => {
+    e.preventDefault();
+    try {
+      const added = await api.createInvestment(newAsset);
+      setInvestments([added, ...(investments || [])]);
+      setIsAddOpen(false);
+      setNewAsset({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
+      const freshDashboard = await api.getDashboard();
+      if (freshDashboard) setDashboard(freshDashboard);
+    } catch (err) { alert("Failed to add asset."); }
+  };
+
+  const confirmDelete = async () => {
+    if (!assetToDelete) return;
+    try {
+      await api.deleteInvestment(assetToDelete);
+      setInvestments((investments || []).filter(a => a.id !== assetToDelete));
+      setAssetToDelete(null);
+      const freshDashboard = await api.getDashboard();
+      if (freshDashboard) setDashboard(freshDashboard);
+    } catch (err) {}
+  };
+
   if (investmentsLoading && !investments) {
-    return (
-      <div className="flex-1 p-10 flex items-center justify-center min-h-[80vh]">
-        <div className="animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">
-          Syncing Portfolio...
-        </div>
-      </div>
-    );
+    return <div className="flex-1 p-10 flex items-center justify-center animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">Syncing Portfolio...</div>;
   }
 
-  // Gracefully fallback to mock data if backend isn't built yet
-  const safeTableData = investments?.assets || investmentsData;
-  const safeChartData = investments?.performance || portfolioPerformanceData;
+  const safeAssets = Array.isArray(investments) ? investments : [];
+  const totalInvested = safeAssets.reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.average_buy_price)), 0);
+  const currentValue = safeAssets.reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
+  const totalGain = currentValue - totalInvested;
+  const totalRoi = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0;
+
+  const stockValue = safeAssets.filter(a => a.asset_type === 'stock').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
+  const mfValue = safeAssets.filter(a => a.asset_type === 'mf').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
+  const cryptoValue = safeAssets.filter(a => a.asset_type === 'crypto').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
+
+  const stockPct = currentValue > 0 ? (stockValue / currentValue) * 100 : 0;
+  const mfPct = currentValue > 0 ? (mfValue / currentValue) * 100 : 0;
+  const cryptoPct = currentValue > 0 ? (cryptoValue / currentValue) * 100 : 0;
+
+  const chartData = [
+    { label: 'Jan', income: totalInvested * 0.8, expense: totalInvested * 0.82 },
+    { label: 'Feb', income: totalInvested * 0.9, expense: totalInvested * 0.95 },
+    { label: 'Mar', income: totalInvested * 0.95, expense: totalInvested * 0.98 },
+    { label: 'Apr', income: totalInvested, expense: currentValue }
+  ];
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-10">
-      
       <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Investment Portfolio</h1>
-          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across active accounts</p>
+          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across {safeAssets.length} active assets</p>
         </div>
         <div className="flex space-x-3">
-          <button className="flex items-center px-4 py-2 bg-[#F8F9FA] dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-[#1E1E1E] transition-colors shadow-sm">
-            Export Report
+          <button onClick={() => setIsAddOpen(true)} className="flex items-center px-4 py-2 bg-[#F8F9FA] dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-[#1E1E1E] transition-colors shadow-sm">
+            <Plus className="w-4 h-4 mr-2" /> Add Asset
           </button>
-          <button className="flex items-center px-4 py-2 bg-[#0A3D8B] dark:bg-gray-700 text-white rounded-lg text-xs font-semibold hover:bg-[#082f6b] dark:hover:bg-gray-600 transition-colors shadow-sm">
-            Rebalance Portfolio
+          <button onClick={handleSync} disabled={isSyncing} className="flex items-center px-4 py-2 bg-[#0A3D8B] dark:bg-gray-700 text-white rounded-lg text-xs font-semibold hover:bg-[#082f6b] dark:hover:bg-gray-600 transition-colors shadow-sm disabled:opacity-70">
+            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing Market...' : 'Sync Market Prices'}
           </button>
         </div>
       </div>
@@ -74,12 +124,12 @@ const Investments = () => {
           </div>
           <div className="relative z-10">
             <p className="text-[10px] font-bold text-blue-200 tracking-widest uppercase mb-1">Current Value</p>
-            <h3 className="text-3xl lg:text-4xl font-bold mb-3 dark:text-gray-100">₹428,592.12</h3>
+            <h3 className="text-3xl lg:text-4xl font-bold mb-3 dark:text-gray-100">₹{currentValue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
             <div className="flex items-center space-x-2">
               <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" /> +₹12,402.50
+                <TrendingUp className="w-3 h-3 mr-1" /> {totalGain >= 0 ? '+' : ''}₹{totalGain.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
               </span>
-              <span className="text-[10px] text-blue-200">Today's Performance</span>
+              <span className="text-[10px] text-blue-200">Total Unrealized</span>
             </div>
           </div>
         </div>
@@ -87,7 +137,7 @@ const Investments = () => {
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-40">
           <div>
             <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Total Invested</p>
-            <h3 className="text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹312,000.00</h3>
+            <h3 className="text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹{totalInvested.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
           </div>
           <div className="flex justify-between items-end">
             <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Cash Basis</p>
@@ -97,18 +147,17 @@ const Investments = () => {
 
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-40">
           <div>
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Portfolio XIRR</p>
-            <h3 className="text-2xl lg:text-3xl font-bold text-[#991B1B] dark:text-emerald-500">14.82%</h3>
+            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Absolute ROI</p>
+            <h3 className={`text-2xl lg:text-3xl font-bold ${totalRoi >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{totalRoi.toFixed(2)}%</h3>
           </div>
           <div className="flex justify-between items-end">
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Annualized</p>
-            <Activity className="w-5 h-5 text-[#991B1B] dark:text-emerald-500" />
+            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Portfolio Yield</p>
+            <Activity className={`w-5 h-5 ${totalRoi >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`} />
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-        
         <div className="xl:col-span-2 bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
           <div className="flex justify-between items-start mb-6">
             <div>
@@ -120,7 +169,7 @@ const Investments = () => {
               <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></div>CURRENT</div>
             </div>
           </div>
-          <AreaChart data={safeChartData} />
+          <AreaChart data={chartData} />
         </div>
 
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
@@ -128,185 +177,179 @@ const Investments = () => {
             <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Asset Allocation</h2>
             <PieChart className="w-4 h-4 text-gray-400" />
           </div>
-          
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className="relative w-48 h-48 mb-6">
               <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#3b82f6" strokeWidth="4" strokeDasharray="42.5 57.5" strokeDashoffset="0"></circle>
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#8b5cf6" strokeWidth="4" strokeDasharray="28.1 71.9" strokeDashoffset="-42.5"></circle>
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#f59e0b" strokeWidth="4" strokeDasharray="15.4 84.6" strokeDashoffset="-70.6"></circle>
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#10b981" strokeWidth="4" strokeDasharray="14 86" strokeDashoffset="-86"></circle>
+                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#3b82f6" strokeWidth="4" strokeDasharray={`${stockPct} ${100 - stockPct}`} strokeDashoffset="0"></circle>
+                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#8b5cf6" strokeWidth="4" strokeDasharray={`${mfPct} ${100 - mfPct}`} strokeDashoffset={`-${stockPct}`}></circle>
+                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#f59e0b" strokeWidth="4" strokeDasharray={`${cryptoPct} ${100 - cryptoPct}`} strokeDashoffset={`-${stockPct + mfPct}`}></circle>
               </svg>
               <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center mt-1">
                 <span className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Total</span>
-                <span className="block text-xl font-bold text-[#0F172A] dark:text-gray-200">5 Assets</span>
+                <span className="block text-xl font-bold text-[#0F172A] dark:text-gray-200">{safeAssets.length} Assets</span>
               </div>
             </div>
-
             <div className="w-full space-y-3">
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Stocks & ETFs</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">42.5%</span>
+                <span className="font-bold text-[#0F172A] dark:text-gray-200">{stockPct.toFixed(1)}%</span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-violet-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Mutual Funds</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">28.1%</span>
+                <span className="font-bold text-[#0F172A] dark:text-gray-200">{mfPct.toFixed(1)}%</span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Real Estate</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">15.4%</span>
+                <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Crypto / Other</span></div>
+                <span className="font-bold text-[#0F172A] dark:text-gray-200">{cryptoPct.toFixed(1)}%</span>
               </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#F0F5FF] dark:bg-[#1A2235] p-6 md:p-8 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Monthly Mandates</h2>
-            <span className="bg-[#E0E7FF] dark:bg-[#202A40] text-[#0A3D8B] dark:text-blue-400 text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest border border-transparent dark:border-[#262626]">Active</span>
-          </div>
-
-          <div className="space-y-3 mb-6">
-            <div className="bg-white dark:bg-[#1E1E1E] p-4 rounded-xl shadow-sm border border-gray-100 dark:border-[#262626] flex justify-between items-center">
-              <div>
-                <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-0.5">Vanguard 500 SIP</p>
-                <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-widest">Next: Oct 05</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">₹1,200.00</p>
-              </div>
-            </div>
-            <div className="bg-white dark:bg-[#1E1E1E] p-4 rounded-xl shadow-sm border border-gray-100 dark:border-[#262626] flex justify-between items-center">
-              <div>
-                <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200 mb-0.5">Gold Accumulation Plan</p>
-                <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold uppercase tracking-widest">Next: Oct 12</p>
-              </div>
-              <div className="text-right">
-                <p className="text-sm font-bold text-[#0A3D8B] dark:text-gray-300 mb-0.5">₹450.00</p>
-              </div>
-            </div>
-          </div>
-          <button className="w-full bg-transparent border border-dashed border-gray-300 dark:border-gray-600 text-gray-500 dark:text-[#a3a3a3] rounded-xl py-3 text-xs font-bold hover:bg-white dark:hover:bg-[#202A40] hover:text-[#0A3D8B] dark:hover:text-gray-200 transition-colors uppercase tracking-wide">
-            + Add New Automation
-          </button>
-        </div>
-
-        <div className="bg-[#0F172A] dark:bg-[#1A2235] p-8 rounded-2xl shadow-md flex flex-col justify-between border border-transparent dark:border-blue-900/30">
-          <div className="mb-4">
-            <span className="bg-blue-600 dark:bg-blue-800 text-white text-[8px] font-bold px-2 py-1 rounded uppercase tracking-widest">Pro Insight</span>
-          </div>
-          <div className="flex justify-between items-start gap-6">
-            <div>
-              <h3 className="text-lg font-bold text-white mb-2">Tax Harvesting Opportunity</h3>
-              <p className="text-xs text-gray-400 dark:text-blue-100 leading-relaxed mb-6">
-                You have ₹2,400 in unrealized short-term losses. Consider switching some equity holdings to offset gains.
-              </p>
-              <button className="text-[10px] font-bold text-white uppercase tracking-widest border-b border-white pb-0.5 hover:text-blue-200 hover:border-blue-200 transition-colors">
-                Review Harvest strategy
-              </button>
-            </div>
-            <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center shrink-0">
-              <Lightbulb className="w-6 h-6 text-blue-400" />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] border-2 border-dashed border-gray-200 dark:border-[#262626] rounded-2xl p-8 flex flex-col items-center justify-center text-center">
-          <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-[#0a0a0a] flex items-center justify-center mb-4 border border-gray-200 dark:border-[#262626]">
-            <History className="w-5 h-5 text-gray-500 dark:text-[#a3a3a3]" />
-          </div>
-          <h3 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-2">Recent Activity</h3>
-          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-6 max-w-xs">
-            Switch of ₹5,000 from Alpha MF to Beta Stocks completed yesterday.
-          </p>
-          <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-gray-400 tracking-widest uppercase hover:underline">
-            View History
-          </button>
         </div>
       </div>
 
       <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden mb-8">
         <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-center border-b border-gray-200 dark:border-[#262626] gap-4">
           <h3 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Active Holdings</h3>
-          <div className="flex space-x-3">
-            <div className="relative">
-              <select className="pl-3 pr-8 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-[10px] font-bold rounded-md appearance-none focus:outline-none focus:border-[#0A3D8B] shadow-sm">
-                <option>Sort by Gain (High to Low)</option>
-              </select>
-              <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none">
-                <ChevronDown className="w-3 h-3 text-gray-500 dark:text-[#a3a3a3]" />
-              </div>
-            </div>
-            <button className="flex items-center justify-center px-2 py-2 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] rounded-md shadow-sm text-gray-500 hover:text-[#0F172A] dark:hover:text-gray-200">
-              <Filter className="w-3 h-3" />
-            </button>
-          </div>
         </div>
-
         <div className="overflow-x-auto">
           <table className="w-full text-left min-w-[900px]">
             <thead>
               <tr className="border-b border-gray-200 dark:border-[#262626] bg-gray-100 dark:bg-[#0a0a0a]">
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Asset Name</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Current Value</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">1-Day Change</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Total Gain</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-center">Goal Link</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-center">Action</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Asset & Ticker</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Quantity</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Avg Price</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Current Price</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Total Value</th>
+                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">P&L</th>
+                <th className="px-6 py-4"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200 dark:divide-[#262626]">
-              {safeTableData.map((item) => {
-                const Icon = item.icon;
+              {safeAssets.map((item) => {
+                const qty = parseFloat(item.quantity);
+                const avgPrice = parseFloat(item.average_buy_price);
+                const curPrice = parseFloat(item.current_price);
+                
+                const invested = qty * avgPrice;
+                const value = qty * curPrice;
+                const pl = value - invested;
+                const plPct = invested > 0 ? (pl / invested) * 100 : 0;
+                
+                const isPositive = pl >= 0;
+
                 return (
                   <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
                     <td className="px-6 py-5 flex items-center space-x-4">
-                      <div className={`w-10 h-10 rounded-lg ${item.iconBg.replace('bg-gray-800', 'bg-[#262626]')} ${item.iconColor} flex items-center justify-center shrink-0`}>
-                        <Icon className="w-5 h-5" />
+                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-[#262626] flex items-center justify-center shrink-0">
+                        <Building2 className="w-5 h-5 text-gray-500" />
                       </div>
                       <div>
                         <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{item.name}</p>
-                        <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold tracking-widest uppercase mt-0.5">{item.type}</p>
+                        <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold tracking-widest uppercase mt-0.5">{item.ticker_symbol}</p>
                       </div>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">{item.value}</p>
+                      <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">{qty.toFixed(4)}</p>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <p className={`text-xs font-bold ${item.dayChangeType === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : item.dayChangeType === 'negative' ? 'text-red-600 dark:text-red-400' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>
-                        {item.dayChange}
+                      <p className="text-sm font-bold text-gray-500 dark:text-[#a3a3a3]">₹{avgPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹{curPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <p className="text-sm font-bold text-[#0A3D8B] dark:text-blue-400">₹{value.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                        {isPositive ? '+' : ''}₹{pl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
+                      </p>
+                      <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isPositive ? 'text-emerald-600/70 dark:text-emerald-500/70' : 'text-red-600/70 dark:text-red-500/70'}`}>
+                        {plPct.toFixed(2)}%
                       </p>
                     </td>
                     <td className="px-6 py-5 text-right">
-                      <p className={`text-sm font-bold ${item.gainType === 'positive' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {item.totalGain}
-                      </p>
-                      <p className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">ROI: {item.roi}</p>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <span className="bg-[#F0F5FF] dark:bg-[#0a0a0a] text-[#0A3D8B] dark:text-gray-400 border border-transparent dark:border-[#262626] text-[8px] font-bold px-2.5 py-1.5 rounded-full uppercase tracking-widest whitespace-nowrap">
-                        {item.goal}
-                      </span>
-                    </td>
-                    <td className="px-6 py-5 text-center">
-                      <button className="text-gray-500 dark:text-[#a3a3a3] hover:text-[#0A3D8B] dark:hover:text-gray-300 transition-colors">
-                        <MoreHorizontal className="w-5 h-5 mx-auto" />
+                      <button onClick={() => setAssetToDelete(item.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
+                        <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
                   </tr>
                 )
               })}
+              {safeAssets.length === 0 && (
+                <tr><td colSpan="7" className="text-center py-8 text-sm text-gray-500">No assets tracked. Add your first investment.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] border-t border-gray-200 dark:border-[#262626] p-4 text-center">
-          <button className="text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase hover:text-[#0A3D8B] dark:hover:text-gray-300 flex items-center justify-center w-full">
-            View All 42 Assets <ChevronDown className="w-3 h-3 ml-1" />
-          </button>
-        </div>
       </div>
+
+      {isAddOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddOpen(false)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-md rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
+              <div>
+                <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Track New Asset</h2>
+                <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Add to portfolio</p>
+              </div>
+              <button onClick={() => setIsAddOpen(false)} className="text-gray-400 hover:text-[#0F172A] dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <form onSubmit={handleAddAsset} className="p-6 space-y-5">
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Name</label>
+                <input required type="text" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} placeholder="e.g. Reliance Industries" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Ticker / MF Code</label>
+                  <input required type="text" value={newAsset.ticker_symbol} onChange={e => setNewAsset({...newAsset, ticker_symbol: e.target.value})} placeholder="RELIANCE.NS or 119062" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Type</label>
+                  <select value={newAsset.asset_type} onChange={e => setNewAsset({...newAsset, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]">
+                    <option value="stock">Stock / ETF</option>
+                    <option value="mf">Mutual Fund</option>
+                    <option value="crypto">Crypto / Other</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Quantity Owned</label>
+                  <input required type="number" step="0.0001" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: e.target.value})} placeholder="10.5" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Avg Buy Price (₹)</label>
+                  <input required type="number" step="0.01" value={newAsset.average_buy_price} onChange={e => setNewAsset({...newAsset, average_buy_price: e.target.value})} placeholder="2500.00" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+              </div>
+              <button type="submit" className="w-full py-3.5 bg-[#0A3D8B] dark:bg-gray-800 text-white rounded-xl text-sm font-bold shadow-lg mt-4">Add Asset</button>
+            </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* CUSTOM DELETE MODAL */}
+      {assetToDelete && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAssetToDelete(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
+            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Untrack Asset?</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to remove this asset? This does not sell the asset.</p>
+            <div className="flex space-x-3">
+              <button onClick={() => setAssetToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
+              <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Untrack</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

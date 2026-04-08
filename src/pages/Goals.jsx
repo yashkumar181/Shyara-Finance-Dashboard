@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Target, Plus, Trash2, Award, History, X, ArrowRight, TrendingUp, CheckCircle2, Home } from 'lucide-react';
+import { Target, Plus, Trash2, Award, History, X, ArrowRight, TrendingUp, CheckCircle2, Home, AlertTriangle } from 'lucide-react';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
-// Map string names to Lucide icons
 const iconMap = { Target, Home, Award, TrendingUp, CheckCircle2 }; 
 
 const Goals = () => {
@@ -15,6 +14,7 @@ const Goals = () => {
   const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
   const [selectedGoalForFunds, setSelectedGoalForFunds] = useState(null);
   const [selectedGoalDetails, setSelectedGoalDetails] = useState(null);
+  const [goalToDelete, setGoalToDelete] = useState(null); // LIVE Modal State
 
   const [newGoal, setNewGoal] = useState({ name: '', target: '', priority: 'Medium', deadline: '' });
   const [fundAmount, setFundAmount] = useState('');
@@ -63,10 +63,13 @@ const Goals = () => {
     }
   };
 
-  const handleDeleteGoal = async (id) => {
+  // LIVE Custom Delete Logic
+  const confirmDeleteGoal = async () => {
+    if(!goalToDelete) return;
     try {
-      await api.deleteGoal(id);
-      setGoals(safeGoals.filter(g => g.id !== id));
+      await api.deleteGoal(goalToDelete);
+      setGoals(safeGoals.filter(g => g.id !== goalToDelete));
+      setGoalToDelete(null);
     } catch (error) {
       console.error(error);
     }
@@ -187,7 +190,7 @@ const Goals = () => {
                         </div>
                       </div>
                     </div>
-                    <button onClick={() => handleDeleteGoal(goal.id)} className="text-gray-400 hover:text-red-500 dark:text-[#a3a3a3] dark:hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#262626]"><Trash2 className="w-4 h-4" /></button>
+                    <button onClick={() => setGoalToDelete(goal.id)} className="text-gray-400 hover:text-red-500 dark:text-[#a3a3a3] dark:hover:text-red-400 transition-colors p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-[#262626]"><Trash2 className="w-4 h-4" /></button>
                   </div>
 
                   <div className="mb-8">
@@ -337,6 +340,26 @@ const Goals = () => {
         </div>,
         document.body
       )}
+
+      {/* CONFIRMATION MODAL */}
+      {goalToDelete && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setGoalToDelete(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
+            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Delete Goal?</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to permanently abandon and delete this target? This action cannot be undone.</p>
+            <div className="flex space-x-3">
+              <button onClick={() => setGoalToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
+              <button onClick={confirmDeleteGoal} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Delete</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };

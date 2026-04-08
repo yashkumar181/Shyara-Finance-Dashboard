@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { RefreshCw, Building2, Wallet, CreditCard, Plus, X, FileText, CheckCircle2, Trash2, ArrowUpRight, ArrowDownRight, Activity } from 'lucide-react';
+import { RefreshCw, Building2, Wallet, CreditCard, Plus, X, FileText, CheckCircle2, Trash2, ArrowUpRight, ArrowDownRight, Activity, AlertTriangle } from 'lucide-react';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
@@ -12,6 +12,7 @@ const Accounts = () => {
   const [isAddAccountOpen, setIsAddAccountOpen] = useState(false);
   const [selectedAccountDetail, setSelectedAccountDetail] = useState(null);
   const [showAuditLog, setShowAuditLog] = useState(false);
+  const [accountToDelete, setAccountToDelete] = useState(null); // LIVE Modal State
 
   const [newAccountData, setNewAccountData] = useState({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
   
@@ -21,7 +22,6 @@ const Accounts = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      // ONLY trigger loading screen if we have no cached accounts
       if (useAppStore.getState().accounts.length === 0) {
         setAccountsLoading(true);
       }
@@ -90,7 +90,7 @@ const Accounts = () => {
     
     try {
       const addedAcc = await api.createAccount(payload);
-      setAccounts([addedAcc, ...useAppStore.getState().accounts]);
+      setAccounts([addedAcc, ...accounts]);
       setIsAddAccountOpen(false);
       setNewAccountData({ name: '', subtitle: '', type: 'bank', balance: '', limit: '' });
     } catch (error) {
@@ -99,12 +99,14 @@ const Accounts = () => {
     }
   };
 
-  const handleDeleteAccount = async (id) => {
-    if(!window.confirm("Are you sure you want to delete this account? All associated transactions will be removed.")) return;
+  // LIVE Custom Delete Logic
+  const confirmDeleteAccount = async () => {
+    if(!accountToDelete) return;
     try {
-      await api.deleteAccount(id);
-      setAccounts(useAppStore.getState().accounts.filter(a => a.id !== id));
-      if (selectedAccountDetail?.id === id) setSelectedAccountDetail(null);
+      await api.deleteAccount(accountToDelete);
+      setAccounts(accounts.filter(a => a.id !== accountToDelete));
+      if (selectedAccountDetail?.id === accountToDelete) setSelectedAccountDetail(null);
+      setAccountToDelete(null);
     } catch (error) {
       console.error("Error deleting account:", error);
     }
@@ -194,7 +196,7 @@ const Accounts = () => {
                   <div className="flex justify-between items-end">
                     <p className="text-[10px] font-semibold text-gray-500 dark:text-[#a3a3a3]">Currency: <span className="text-emerald-600 dark:text-emerald-400 font-bold">{acc.currency || 'INR'}</span></p>
                     <div className="flex items-center space-x-4">
-                      <button onClick={() => handleDeleteAccount(acc.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
+                      <button onClick={() => setAccountToDelete(acc.id)} className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"><Trash2 className="w-3.5 h-3.5" /></button>
                       <button onClick={() => setSelectedAccountDetail(acc)} className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-wider hover:underline">DETAILS</button>
                     </div>
                   </div>
@@ -234,7 +236,7 @@ const Accounts = () => {
                             <h4 className="text-sm font-bold text-white cursor-pointer hover:underline" onClick={() => setSelectedAccountDetail(card)}>{card.nickname || card.bank_name}</h4>
                             <p className="text-[10px] text-gray-400 font-medium tracking-wide">{card.bank_name || 'Credit Card'}</p>
                           </div>
-                          <button onClick={() => handleDeleteAccount(card.id)} className="text-gray-400 hover:text-red-400 transition-colors ml-4 pt-1">
+                          <button onClick={() => setAccountToDelete(card.id)} className="text-gray-400 hover:text-red-400 transition-colors ml-4 pt-1">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -426,7 +428,10 @@ const Accounts = () => {
                   <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">{selectedAccountDetail.bank_name || selectedAccountDetail.account_type}</p>
                 </div>
               </div>
-              <button onClick={() => setSelectedAccountDetail(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+              <div className="flex items-center space-x-2">
+                <button onClick={() => setAccountToDelete(selectedAccountDetail.id)} className="text-red-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"><Trash2 className="w-5 h-5" /></button>
+                <button onClick={() => setSelectedAccountDetail(null)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+              </div>
             </div>
 
             <div className="p-6 overflow-y-auto space-y-6 flex-1">
@@ -521,6 +526,24 @@ const Accounts = () => {
         document.body
       )}
 
+      {/* CONFIRMATION MODAL */}
+      {accountToDelete && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAccountToDelete(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
+            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Delete Account?</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to delete this account? All associated transactions will be removed. This action cannot be undone.</p>
+            <div className="flex space-x-3">
+              <button onClick={() => setAccountToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
+              <button onClick={confirmDeleteAccount} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Delete</button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 };

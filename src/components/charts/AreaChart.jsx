@@ -1,84 +1,107 @@
 import React, { useState } from 'react';
 
-const AreaChart = ({ data }) => {
-  const [hoverPoint, setHoverPoint] = useState(null);
+const AreaChart = ({ data = [] }) => {
+  const [activeIndex, setActiveIndex] = useState(null);
 
-  const maxVal = Math.max(...data.map(d => Math.max(d.invested, d.current))) * 1.1;
-  const svgWidth = 600;
-  const svgHeight = 220;
-  const paddingLeft = 50;
-  const paddingBottom = 30;
-  const chartWidth = svgWidth - paddingLeft;
-  const chartHeight = svgHeight - paddingBottom;
+  // Safely handle empty states to prevent division by zero
+  const safeData = data && data.length > 0 ? data : [
+    { label: 'No Data', income: 0, expense: 0 }
+  ];
 
-  const xMap = (idx) => paddingLeft + (idx / (data.length - 1)) * chartWidth;
-  const yMap = (val) => chartHeight - (val / maxVal) * chartHeight;
+  const maxDataValue = Math.max(...safeData.flatMap(d => [(d.income || 0), (d.expense || 0)]));
+  const maxValue = maxDataValue > 0 ? maxDataValue * 1.2 : 1000;
 
-  // Paths for the solid lines
-  const lineInvested = data.map((d, i) => `${xMap(i)},${yMap(d.invested)}`).join(' ');
-  const lineCurrent = data.map((d, i) => `${xMap(i)},${yMap(d.current)}`).join(' ');
+  const width = 800;
+  const height = 250;
+  const pad = { top: 20, right: 20, bottom: 30, left: 60 };
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
 
-  // Paths for the shaded areas (connecting to the bottom corners)
-  const areaInvested = `${xMap(0)},${chartHeight} ${lineInvested} ${xMap(data.length - 1)},${chartHeight}`;
-  const areaCurrent = `${xMap(0)},${chartHeight} ${lineCurrent} ${xMap(data.length - 1)},${chartHeight}`;
+  const getX = (i) => pad.left + (i * (chartW / Math.max(safeData.length - 1, 1)));
+  const getY = (val) => pad.top + chartH - (((val || 0) / maxValue) * chartH);
 
-  const formatYAxis = (val) => val === 0 ? '$0' : `$${(val / 1000).toFixed(0)}k`;
+  const incomePoints = safeData.map((d, i) => `${getX(i)},${getY(d.income)}`).join(' ');
+  const expensePoints = safeData.map((d, i) => `${getX(i)},${getY(d.expense)}`).join(' ');
+
+  const incomeArea = `${pad.left},${getY(0)} ${incomePoints} ${getX(safeData.length - 1)},${getY(0)}`;
+  const expenseArea = `${pad.left},${getY(0)} ${expensePoints} ${getX(safeData.length - 1)},${getY(0)}`;
 
   return (
-    <div className="flex-1 w-full relative min-h-[250px]" onMouseLeave={() => setHoverPoint(null)}>
-      <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-full overflow-visible" preserveAspectRatio="none">
+    // FIX: Removed overflow-x-auto and fixed min-width. Now it is purely responsive.
+    <div className="w-full relative pb-2"> 
+      <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto overflow-visible">
         
-        {/* Y-Axis Grid Lines & Labels */}
-        {[0, 1, 2, 3].map(i => {
-          const yPos = (i * chartHeight) / 3;
-          const valValue = maxVal - (maxVal * i) / 3;
+        {/* Background Grid Lines */}
+        {[0, 1, 2, 3, 4].map(i => {
+          const y = pad.top + chartH - (i * (chartH / 4));
+          const val = (maxValue * i) / 4;
           return (
-            <g key={`grid-${i}`}>
-              <text x="0" y={yPos + 4} className="text-[10px] fill-gray-400 dark:fill-gray-500 font-medium">
-                {formatYAxis(valValue)}
+            <g key={i}>
+              <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} stroke="currentColor" className="text-gray-200 dark:text-[#262626]" strokeDasharray="4 4" />
+              <text x={pad.left - 10} y={y + 4} textAnchor="end" className="text-[10px] font-bold fill-gray-400 dark:fill-[#a3a3a3]">
+                ₹{val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val.toFixed(0)}
               </text>
-              <line x1={paddingLeft} y1={yPos} x2={svgWidth} y2={yPos} stroke="currentColor" className="text-gray-100 dark:text-white/5" strokeWidth="1" strokeDasharray="3 3" />
             </g>
-          );
+          )
         })}
 
-        {/* Shaded Areas */}
-        <polygon points={areaInvested} fill="currentColor" className="text-slate-400 dark:text-slate-500 opacity-10 dark:opacity-20" />
-        <polygon points={areaCurrent} fill="currentColor" className="text-emerald-500 opacity-10 dark:opacity-20" />
+        {/* Income Area (Invested) */}
+        <polygon points={incomeArea} fill="url(#incomeGrad)" opacity="0.3" />
+        <polyline points={incomePoints} fill="none" stroke="#94A3B8" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
 
-        {/* Solid Lines */}
-        <polyline points={lineInvested} fill="none" stroke="currentColor" className="text-slate-400 dark:text-slate-500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        <polyline points={lineCurrent} fill="none" stroke="currentColor" className="text-emerald-500" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Expense Area (Current Value) */}
+        <polygon points={expenseArea} fill="url(#expenseGrad)" opacity="0.3" />
+        <polyline points={expensePoints} fill="none" stroke="#10B981" strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />
 
-        {/* Interaction Hover Zones */}
-        {data.map((d, i) => {
-          const widthPerZone = chartWidth / Math.max(1, data.length - 1);
-          return <rect key={i} x={xMap(i) - widthPerZone / 2} y="0" width={widthPerZone} height={chartHeight} fill="transparent" className="cursor-crosshair" onMouseEnter={() => setHoverPoint({ index: i, ...d, x: xMap(i), yInv: yMap(d.invested), yCur: yMap(d.current) })} />;
+        {/* Hover Interaction Overlay */}
+        {safeData.map((d, i) => {
+          const x = getX(i);
+          return (
+            <g key={i} onMouseEnter={() => setActiveIndex(i)} onMouseLeave={() => setActiveIndex(null)} className="cursor-pointer">
+              <line x1={x} y1={pad.top} x2={x} y2={pad.top + chartH} stroke="transparent" strokeWidth="40" />
+              {activeIndex === i && (
+                <>
+                  <line x1={x} y1={pad.top} x2={x} y2={pad.top + chartH} stroke="#0A3D8B" strokeWidth="1" strokeDasharray="4 4" opacity="0.5" />
+                  <circle cx={x} cy={getY(d.income)} r="4" fill="#94A3B8" stroke="#fff" strokeWidth="2" />
+                  <circle cx={x} cy={getY(d.expense)} r="4" fill="#10B981" stroke="#fff" strokeWidth="2" />
+                </>
+              )}
+              <text x={x} y={height - 5} textAnchor="middle" className="text-[10px] font-bold fill-gray-500 dark:fill-[#a3a3a3] uppercase tracking-wider">{d.label}</text>
+            </g>
+          )
         })}
 
-        {/* Hover Crosshair & Tooltip Anchors */}
-        {hoverPoint && (
-          <>
-            <line x1={hoverPoint.x} y1="0" x2={hoverPoint.x} y2={chartHeight} stroke="currentColor" className="text-gray-400 dark:text-gray-500" strokeWidth="1" strokeDasharray="4 4" opacity="0.4" pointerEvents="none" />
-            <circle cx={hoverPoint.x} cy={hoverPoint.yInv} r="4" fill="currentColor" className="text-white dark:text-[#1E1E1E] stroke-slate-500" strokeWidth="2" pointerEvents="none" />
-            <circle cx={hoverPoint.x} cy={hoverPoint.yCur} r="4" fill="currentColor" className="text-white dark:text-[#1E1E1E] stroke-emerald-500" strokeWidth="2" pointerEvents="none" />
-          </>
-        )}
+        {/* Gradients */}
+        <defs>
+          <linearGradient id="incomeGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#94A3B8" stopOpacity="0.8"/>
+            <stop offset="100%" stopColor="#94A3B8" stopOpacity="0"/>
+          </linearGradient>
+          <linearGradient id="expenseGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#10B981" stopOpacity="0.8"/>
+            <stop offset="100%" stopColor="#10B981" stopOpacity="0"/>
+          </linearGradient>
+        </defs>
       </svg>
-
-      {/* X-Axis Labels */}
-      <div className="absolute left-0 right-0 bottom-0 flex justify-between px-[2%] pl-[50px]">
-        {data.map((d, i) => (
-          <span key={i} className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest transform -translate-x-1/2" style={{ position: 'absolute', left: `${paddingLeft + (i / (data.length - 1)) * chartWidth}px` }}>{d.month}</span>
-        ))}
-      </div>
-
-      {/* Interactive Tooltip Pop-up */}
-      {hoverPoint && (
-        <div className="absolute bg-[#0F172A] dark:bg-[#121212] text-white p-3 rounded-xl shadow-2xl text-xs z-10 pointer-events-none transition-all duration-100 ease-out min-w-[140px] border dark:border-white/10" style={{ left: `${(hoverPoint.x / svgWidth) * 100}%`, top: `${Math.min(hoverPoint.yInv, hoverPoint.yCur) - 15}px`, transform: `translate(${hoverPoint.index === 0 ? '0%' : hoverPoint.index === data.length - 1 ? '-100%' : '-50%'}, -100%)` }}>
-          <p className="font-bold mb-2 border-b border-gray-700 dark:border-gray-800 pb-2 text-[10px] uppercase tracking-widest text-gray-300 dark:text-gray-400">{hoverPoint.month}</p>
-          <div className="flex items-center justify-between space-x-4 mb-2"><span className="flex items-center text-emerald-400"><div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></div>Current</span><span className="font-bold text-sm">${hoverPoint.current.toLocaleString()}</span></div>
-          <div className="flex items-center justify-between space-x-4"><span className="flex items-center text-slate-400"><div className="w-1.5 h-1.5 rounded-full bg-slate-400 mr-2"></div>Invested</span><span className="font-bold text-sm">${hoverPoint.invested.toLocaleString()}</span></div>
+      
+      {/* FIX: Tooltip uses relative % math to track perfectly regardless of how the SVG scales */}
+      {activeIndex !== null && (
+        <div 
+          className="absolute bg-white dark:bg-[#1A1A1A] border border-gray-200 dark:border-[#333] shadow-xl rounded-xl p-3 pointer-events-none transform -translate-x-1/2 -translate-y-full transition-all z-50 min-w-[140px]"
+          style={{
+            left: `${(getX(activeIndex) / width) * 100}%`,
+            top: `calc(${((getY(Math.max(safeData[activeIndex].expense || 0, safeData[activeIndex].income || 0))) / height) * 100}% - 25px)`
+          }}
+        >
+          <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2 border-b border-gray-100 dark:border-[#333] pb-1">{safeData[activeIndex].label}</p>
+          <div className="flex justify-between items-center gap-4 mb-1">
+            <span className="text-xs font-bold text-gray-500 flex items-center"><div className="w-2 h-2 rounded-full bg-slate-400 mr-1.5"></div>Invested</span>
+            <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">₹{(safeData[activeIndex].income || 0).toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>
+          </div>
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-xs font-bold text-gray-500 flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-1.5"></div>Current</span>
+            <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">₹{(safeData[activeIndex].expense || 0).toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>
+          </div>
         </div>
       )}
     </div>

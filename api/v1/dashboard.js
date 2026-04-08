@@ -17,7 +17,8 @@ export default async function handler(req, res) {
     const [
       accountsRows, 
       monthlySpentRow, 
-      totalBudgetRow, // <-- WE ARE FIXING THIS QUERY
+      investmentsRow, 
+      totalBudgetRow, 
       recentTxns, 
       wealthHistoryMonthly,
       wealthHistoryWeekly,
@@ -27,10 +28,8 @@ export default async function handler(req, res) {
     ] = await Promise.all([
       sql`SELECT id, nickname, account_type, balance, outstanding, credit_limit FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`,
       sql`SELECT COALESCE(SUM(amount), 0) AS total FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND TO_CHAR(transaction_date, 'YYYY-MM') = ${currentMonth}`,
-      
-      // FIXED: Now pointing to the new budget_configurations table
+      sql`SELECT COALESCE(SUM(current_price * quantity), 0) AS total FROM investments WHERE user_id = ${uid}`,
       sql`SELECT COALESCE(SUM(monthly_limit), 0) AS total FROM budget_configurations WHERE user_id = ${uid}`,
-      
       sql`SELECT t.id, t.amount, t.type, t.category, t.sub_category, t.merchant, t.transaction_date, a.nickname AS account_name FROM transactions t LEFT JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} ORDER BY t.transaction_date DESC LIMIT 5`,
       sql`SELECT TO_CHAR(transaction_date, 'Mon') AS label, TO_CHAR(transaction_date, 'YYYY-MM') AS sort_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY label, sort_key ORDER BY sort_key ASC`,
       sql`SELECT 'Week ' || TO_CHAR(transaction_date, 'W') AS label, TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') AS sort_key, SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) AS income, SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) AS expenses FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '4 weeks' GROUP BY label, sort_key ORDER BY sort_key ASC`,
@@ -86,8 +85,10 @@ export default async function handler(req, res) {
       };
     });
 
+    const totalInvestments = parseFloat(investmentsRow?.[0]?.total) || 0;
+
     res.status(200).json({
-      netWorth: bankBalance - creditDebt,
+      netWorth: bankBalance - creditDebt + totalInvestments,
       bankBalance,
       creditDebt,
       monthlySpent: parseFloat(monthlySpentRow?.[0]?.total) || 0,
@@ -112,7 +113,6 @@ export default async function handler(req, res) {
       goals: goals
     });
   } catch (error) {
-    console.error("Dashboard DB Error:", error);
     res.status(500).json({ error: "Failed to load dashboard data" });
   }
 }

@@ -13,16 +13,15 @@ const Subscriptions = () => {
   const [isAddSubOpen, setIsAddSubOpen] = useState(false);
   const [newSubData, setNewSubData] = useState({ service_name: '', amount: '', billing_day: '1', category: 'Entertainment' });
   const [isExporting, setIsExporting] = useState(false);
+  const [subToDelete, setSubToDelete] = useState(null); // LIVE Modal State
 
-  // Instant Load Pattern
   const loadSubs = async () => {
-    // Only block UI if we don't have cached data
     if (!useAppStore.getState().subscriptions) {
       setSubscriptionsLoading(true);
     }
     try {
       const data = await api.getSubscriptions('active');
-      setSubscriptions(data); // Silently updates in the background
+      setSubscriptions(data);
     } catch (err) {
       console.error("Failed to load subscriptions", err);
     } finally {
@@ -34,7 +33,6 @@ const Subscriptions = () => {
     loadSubs();
   }, [api, setSubscriptions, setSubscriptionsLoading]);
 
-  // Loading Screen (Only triggers on cold boot)
   if (subscriptionsLoading && !subscriptions) {
     return (
       <div className="flex-1 p-10 flex items-center justify-center min-h-[80vh]">
@@ -94,11 +92,13 @@ const Subscriptions = () => {
     }
   };
 
-  const handleDeleteService = async (id) => {
-    if (!window.confirm("Are you sure you want to cancel and track this subscription as deleted?")) return;
+  // LIVE Custom Delete Logic
+  const confirmDeleteSub = async () => {
+    if (!subToDelete) return;
     try {
-      await api.deleteSubscription(id);
+      await api.deleteSubscription(subToDelete);
       await loadSubs();
+      setSubToDelete(null);
     } catch (error) {
       console.error("Error deleting subscription:", error);
     }
@@ -121,7 +121,6 @@ const Subscriptions = () => {
 
   return (
     <div className="flex-1 overflow-auto p-4 md:p-10">
-      
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
         <div className="xl:col-span-2 bg-white dark:bg-[#1E1E1E] p-8 rounded-2xl shadow-sm border border-gray-50 dark:border-white/5 flex flex-col justify-between">
           <div>
@@ -229,7 +228,7 @@ const Subscriptions = () => {
                     </td>
                     <td className="px-6 py-5 text-right flex items-center justify-end h-full mt-2">
                       <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mr-4">₹{parseFloat(sub.amount).toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
-                      <button onClick={() => handleDeleteService(sub.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1">
+                      <button onClick={() => setSubToDelete(sub.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>
@@ -319,6 +318,25 @@ const Subscriptions = () => {
               </div>
               <button type="submit" className="w-full py-3.5 bg-[#0A3D8B] dark:bg-gray-800 hover:bg-[#082f6b] dark:hover:bg-gray-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg mt-4">Save Subscription</button>
             </form>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* CONFIRMATION MODAL */}
+      {subToDelete && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSubToDelete(null)}></div>
+          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
+            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Cancel Service?</h2>
+            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to cancel and track this subscription as deleted? This action cannot be undone.</p>
+            <div className="flex space-x-3">
+              <button onClick={() => setSubToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
+              <button onClick={confirmDeleteSub} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Delete</button>
+            </div>
           </div>
         </div>,
         document.body
