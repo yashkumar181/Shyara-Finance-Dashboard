@@ -75,6 +75,12 @@ export const useAppStore = create(
       setGoals: (g) => set({ goals: g }),
       setGoalsLoading: (v) => set({ goalsLoading: v }),
 
+      // --- INSIGHTS STATE (NEW AI BRAIN) ---
+      insights: null,
+      insightsLoading: false,
+      setInsights: (i) => set({ insights: i }),
+      setInsightsLoading: (v) => set({ insightsLoading: v }),
+
       // --- AGGREGATE METRICS ---
       currentNetWorth: 0,
       monthlyBudget: 0,
@@ -85,7 +91,7 @@ export const useAppStore = create(
       name: 'shyara-wealth-engine-cache',
       partialize: (state) => ({
         // We save the raw data and user preferences to the hard drive, 
-        // while ignoring loading/UI states like `isTransactionSheetOpen`.
+        // while intentionally ignoring loading/UI states and AI Insights (to ensure fresh predictions).
         preferences: state.preferences,
         user: state.user,
         dashboard: state.dashboard,

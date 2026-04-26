@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart, Download, PieChart } from 'lucide-react';
+// ADD Lightbulb to your lucide-react imports
+import { LayoutDashboard, Landmark, ReceiptText, PlaySquare, Target, Settings, Plus, HelpCircle, LineChart, Download, PieChart, Lightbulb } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 import TransactionSheet from './TransactionSheet';
 import myLogo from '../assets/logo.jpg';
@@ -21,11 +22,8 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
   };
 
   const handleExportLiveState = () => {
-    const exportPayload = {
-      timestamp: new Date().toISOString(),
-      user: user,
-      dashboard, transactions, accounts, budget, subscriptions, investments
-    };
+    // Keep your existing export logic
+    const exportPayload = { timestamp: new Date().toISOString(), user, dashboard, transactions, accounts, budget, subscriptions, investments };
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportPayload, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -54,6 +52,9 @@ const Sidebar = ({ isMobileMenuOpen, setIsMobileMenuOpen }) => {
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/accounts" className={navLinkClass}><Landmark className="w-4 h-4 mr-3 shrink-0" /> ACCOUNTS</NavLink>
             <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/transactions" className={navLinkClass}><ReceiptText className="w-4 h-4 mr-3 shrink-0" /> TRANSACTIONS</NavLink>
             
+            {/* --- ADD NEW INSIGHTS LINK HERE --- */}
+            <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/insights" className={navLinkClass}><Lightbulb className="w-4 h-4 mr-3 shrink-0" /> INSIGHTS</NavLink>
+
             {preferences?.showSubscriptions !== false && (
               <NavLink onClick={() => setIsMobileMenuOpen(false)} to="/subscriptions" className={navLinkClass}><PlaySquare className="w-4 h-4 mr-3 shrink-0" /> SUBSCRIPTIONS</NavLink>
             )}

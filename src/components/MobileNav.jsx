@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, CreditCard, ReceiptText, TrendingUp, RefreshCw, Target, PieChart } from 'lucide-react';
+// ADD Lightbulb to imports
+import { LayoutDashboard, CreditCard, ReceiptText, TrendingUp, RefreshCw, Target, PieChart, Lightbulb } from 'lucide-react';
 import { useAppStore } from '../store/useAppStore';
 
 const MobileNav = () => {
@@ -10,6 +11,8 @@ const MobileNav = () => {
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/accounts', icon: CreditCard, label: 'Accounts' },
     { to: '/transactions', icon: ReceiptText, label: 'Transactions' },
+    // ADD NEW INSIGHTS ROUTE HERE
+    { to: '/insights', icon: Lightbulb, label: 'Insights' },
     { to: '/budget', icon: PieChart, label: 'Budget' },
     { to: '/subscriptions', icon: RefreshCw, label: 'Subscriptions' },
     { to: '/investments', icon: TrendingUp, label: 'Investments' },
@@ -21,7 +24,7 @@ const MobileNav = () => {
     if (item.to === '/subscriptions') return preferences?.showSubscriptions !== false;
     if (item.to === '/investments') return preferences?.showInvestments !== false;
     if (item.to === '/goals') return preferences?.showGoals !== false;
-    return true;
+    return true; // Dashboard, Accounts, Transactions, Insights always show
   });
 
   return (

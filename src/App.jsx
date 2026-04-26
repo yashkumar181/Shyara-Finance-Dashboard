@@ -9,6 +9,7 @@ import Investments from './pages/Investments';
 import Goals from './pages/Goals';
 import Settings from './pages/Settings';
 import { FinanceProvider } from './context/FinanceContext';
+import Insights from './pages/Insights';
 import Budget from './pages/Budget';
 function App() {
   return (
@@ -27,6 +28,7 @@ function App() {
             <Route path="investments" element={<Investments />} />
             <Route path="goals" element={<Goals />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="/insights" element={<Insights />} />
             <Route path="budget" element={<Budget />} />
             {/* Catch-all for undefined routes */}
             <Route path="*" element={

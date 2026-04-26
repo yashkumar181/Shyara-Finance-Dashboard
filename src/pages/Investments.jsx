@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { 
-  TrendingUp, Wallet, Activity, PieChart, ChevronDown, Filter, 
-  History, Lightbulb, Building2, Landmark, MoreHorizontal, Plus, 
-  RefreshCw, X, Trash2, AlertTriangle
+  TrendingUp, Wallet, Activity, PieChart, Building2, 
+  Plus, RefreshCw, X, Trash2, AlertTriangle, BrainCircuit, TrendingDown, Coins, ArrowRight
 } from 'lucide-react';
 import AreaChart from '../components/charts/AreaChart';
 import { useApi } from '../lib/api';
@@ -11,7 +10,8 @@ import { useAppStore } from '../store/useAppStore';
 
 const Investments = () => {
   const api = useApi();
-  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading, setDashboard } = useAppStore();
+  // Added setInsights here so we can save the data!
+  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading, setDashboard, insights, setInsights } = useAppStore();
   
   const [isSyncing, setIsSyncing] = useState(false);
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -19,11 +19,16 @@ const Investments = () => {
   
   const [newAsset, setNewAsset] = useState({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
 
+  // Upgraded loader to fetch both Investments and AI Insights in parallel
   const loadInvestments = async () => {
     if (!useAppStore.getState().investments) setInvestmentsLoading(true);
     try {
-      const data = await api.getInvestments();
-      setInvestments(Array.isArray(data) ? data : []);
+      const [invData, insData] = await Promise.all([
+        api.getInvestments(),
+        api.getInsights().catch(() => null) // Catch error so it doesn't break investments
+      ]);
+      setInvestments(Array.isArray(invData) ? invData : []);
+      if (insData) setInsights(insData);
     } catch (err) {
       setInvestments([]);
     } finally {
@@ -31,7 +36,7 @@ const Investments = () => {
     }
   };
 
-  useEffect(() => { loadInvestments(); }, [api, setInvestments, setInvestmentsLoading]);
+  useEffect(() => { loadInvestments(); }, [api, setInvestments, setInvestmentsLoading, setInsights]);
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -41,8 +46,13 @@ const Investments = () => {
          alert("Market Sync Failed: " + updatedData.error);
       } else {
          setInvestments(Array.isArray(updatedData) ? updatedData : []);
-         const freshDashboard = await api.getDashboard();
+         // Also refresh dashboard and insights after sync
+         const [freshDashboard, freshInsights] = await Promise.all([
+           api.getDashboard().catch(() => null),
+           api.getInsights().catch(() => null)
+         ]);
          if (freshDashboard) setDashboard(freshDashboard);
+         if (freshInsights) setInsights(freshInsights);
       }
     } catch (err) {
       alert("Network error: Failed to reach market data servers.");
@@ -60,6 +70,10 @@ const Investments = () => {
       setNewAsset({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
       const freshDashboard = await api.getDashboard();
       if (freshDashboard) setDashboard(freshDashboard);
+      
+      // Refresh insights to include new asset
+      const freshInsights = await api.getInsights();
+      if (freshInsights) setInsights(freshInsights);
     } catch (err) { alert("Failed to add asset."); }
   };
 
@@ -71,6 +85,10 @@ const Investments = () => {
       setAssetToDelete(null);
       const freshDashboard = await api.getDashboard();
       if (freshDashboard) setDashboard(freshDashboard);
+      
+      // Refresh insights to reflect deleted asset
+      const freshInsights = await api.getInsights();
+      if (freshInsights) setInsights(freshInsights);
     } catch (err) {}
   };
 
@@ -100,7 +118,8 @@ const Investments = () => {
   ];
 
   return (
-<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
+    <div className="flex-1 overflow-auto p-4 md:p-10 pb-28 md:pb-10 relative">
+      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Investment Portfolio</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across {safeAssets.length} active assets</p>
@@ -114,6 +133,53 @@ const Investments = () => {
             {isSyncing ? 'Syncing Market...' : 'Sync Market Prices'}
           </button>
         </div>
+      </div>
+
+      {/* PORTFOLIO INTELLIGENCE SECTION */}
+      <div className="mb-8">
+        <div className="flex items-center space-x-2 mb-4">
+          <BrainCircuit className="w-4 h-4 text-[#0A3D8B] dark:text-blue-400" />
+          <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 tracking-tight uppercase">Portfolio Intelligence</h2>
+        </div>
+
+        {!insights ? (
+          <div className="p-6 bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-[#262626] flex items-center space-x-4 animate-pulse">
+            <BrainCircuit className="w-6 h-6 text-[#0A3D8B] dark:text-blue-500" />
+            <div>
+              <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Analyzing Portfolio...</h2>
+              <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">Crunching live market data for insights.</p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {insights.taxLossOpportunities?.length > 0 ? (
+              <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
+                <TrendingDown className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400 mb-3" />
+                <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Tax Loss Harvesting</h4>
+                <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed mb-3">Sell {insights.taxLossOpportunities[0].name} to harvest ₹{insights.taxLossOpportunities[0].harvestable_loss.toLocaleString('en-IN')} in losses.</p>
+                <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-gray-400 uppercase tracking-widest flex items-center hover:underline">Review Strategy <ArrowRight className="w-3 h-3 ml-1" /></button>
+              </div>
+            ) : (
+              <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626] opacity-60">
+                <TrendingDown className="w-5 h-5 text-gray-400 mb-3" />
+                <h4 className="text-sm font-bold text-gray-500 mb-1">No Tax Losses</h4>
+                <p className="text-xs text-gray-400 leading-relaxed">Your portfolio is too profitable to harvest tax losses.</p>
+              </div>
+            )}
+
+            <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
+              <Coins className="w-5 h-5 text-yellow-500 mb-3" />
+              <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Dividend Snowball</h4>
+              <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Pacing to generate <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{insights.annualDividends?.toLocaleString('en-IN') || '0'}</span> in passive income this year.</p>
+            </div>
+
+            <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
+              <Activity className="w-5 h-5 text-purple-500 mb-3" />
+              <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Portfolio Beta</h4>
+              <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Risk score is <span className={`font-bold ${parseFloat(insights.portfolioBeta) > 1.2 ? 'text-red-500' : 'text-emerald-500'}`}>{insights.portfolioBeta || '1.0'}</span>. {parseFloat(insights.portfolioBeta) > 1.2 ? 'High volatility detected.' : 'Market stable.'}</p>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">

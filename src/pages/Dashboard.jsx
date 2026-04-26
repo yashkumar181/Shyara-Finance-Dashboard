@@ -4,7 +4,7 @@ import { Wallet, CreditCard, PiggyBank, TrendingUp, Home, GraduationCap, Plus, L
 import LineChart from '../components/charts/LineChart';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
-
+import SmartInsightsWidget from '../components/SmartInsightsWidget';
 const iconMap = { Laptop, Home, ShoppingCart, Tv, CreditCard, GraduationCap, Target, TrendingUp };
 
 const Dashboard = () => {
@@ -13,24 +13,37 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const api = useApi();
-  const { dashboard, dashboardLoading, setDashboard, setDashboardLoading } = useAppStore();
+  const { dashboard, dashboardLoading, setDashboard, setDashboardLoading, insights, setInsights } = useAppStore();
 
   useEffect(() => {
-    const loadDashboard = async () => {
+    const loadData = async () => {
       if (!useAppStore.getState().dashboard) {
         setDashboardLoading(true);
       }
+      
+      // 1. Fetch Standard Dashboard
       try {
-        const data = await api.getDashboard();
-        setDashboard(data);
+        const dashData = await api.getDashboard();
+        setDashboard(dashData);
       } catch (error) {
-        console.error(error);
+        console.error("Dashboard failed:", error);
       } finally {
         setDashboardLoading(false);
       }
+
+      // 2. Fetch AI Insights
+      try {
+        console.log("Attempting to fetch Insights from backend...");
+        const insightsData = await api.getInsights();
+        console.log("Successfully fetched Insights:", insightsData);
+        setInsights(insightsData);
+      } catch (error) {
+        console.error("🚨 INSIGHTS FETCH FAILED! Check api.js or insights.js 🚨", error);
+      }
     };
-    loadDashboard();
-  }, [api, setDashboard, setDashboardLoading]);
+    
+    loadData();
+  }, [api, setDashboard, setDashboardLoading, setInsights]);
 
   if (!dashboard) {
     return (
@@ -70,7 +83,8 @@ const Dashboard = () => {
   const dynamicChartData = dashboard.charts?.[chartTimeframe] || [];
 
   return (
-<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
+    <div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">
+      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Your Financial Overview</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Live metrics synchronized securely.</p>
@@ -81,6 +95,9 @@ const Dashboard = () => {
           ))}
         </div>
       </div>
+
+      {/* --- INJECTED SMART INSIGHTS WIDGET --- */}
+      <SmartInsightsWidget insights={insights} />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         
