@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrainCircuit, ShieldAlert, TrendingDown, Coins, Activity, ArrowRight, Zap, Target, HeartPulse } from 'lucide-react';
+import { BrainCircuit, ShieldAlert, TrendingDown, Coins, Activity, ArrowRight, Zap, Target, AlertTriangle, Calendar, TrendingUp } from 'lucide-react';
 
 const SmartInsightsWidget = ({ insights }) => {
   const [impulseAmount, setImpulseAmount] = useState('');
@@ -35,16 +35,14 @@ const SmartInsightsWidget = ({ insights }) => {
         <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 tracking-tight">Shyara Intelligence</h2>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        {/* --- NEW: CASH FLOW HEALTH SCORE --- */}
+      {/* --- ROW 1: HEALTH SCORE & 30-DAY FORECAST --- */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        
+        {/* Insight 1: Cash Flow Health Score */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl p-6 shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col md:flex-row items-center gap-8">
-          
-          {/* Circular Gauge */}
           <div className="relative w-32 h-32 shrink-0">
             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-              {/* Background Track */}
               <circle cx="18" cy="18" r="15.9155" fill="none" className="stroke-gray-200 dark:stroke-gray-800" strokeWidth="3"></circle>
-              {/* Score Track */}
               <circle 
                 cx="18" cy="18" r="15.9155" fill="none" 
                 className={`${healthStroke} transition-all duration-1000 ease-out`} 
@@ -57,7 +55,6 @@ const SmartInsightsWidget = ({ insights }) => {
             </div>
           </div>
 
-          {/* Sub-Metrics */}
           <div className="flex-1 w-full space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">Income Stability</span>
@@ -85,53 +82,86 @@ const SmartInsightsWidget = ({ insights }) => {
           </div>
         </div>
 
-        {/* Hero Metric: Safe to Spend (Existing) */}
-        <div className="xl:col-span-2 bg-gradient-to-r from-[#0A3D8B] to-[#1E3A8A] dark:from-[#1A2235] dark:to-[#121212] rounded-2xl p-6 text-white shadow-lg relative overflow-hidden border border-transparent dark:border-[#262626]">
-          <div className="absolute right-0 top-0 opacity-10 transform translate-x-4 -translate-y-4 pointer-events-none">
-            <Activity className="w-32 h-32" />
-          </div>
-          <div className="relative z-10 flex flex-col md:flex-row justify-between md:items-center gap-4 h-full">
+        {/* Insight 4: 30-Day Balance Forecast */}
+        <div className={`rounded-2xl p-6 shadow-sm border relative overflow-hidden flex flex-col justify-between ${insights.hitsZero ? 'bg-[#FFF0F0] dark:bg-[#3A1C1C] border-red-100 dark:border-red-900/30' : 'bg-gradient-to-br from-[#F0F5FF] to-[#E0EFFF] dark:from-[#1A2235] dark:to-[#121E36] border-blue-100 dark:border-blue-900/30'}`}>
+          <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-[10px] font-bold text-blue-200 tracking-widest uppercase mb-1 flex items-center"><Zap className="w-3 h-3 mr-1"/> Safe-To-Spend Daily</p>
-              <h3 className="text-4xl font-bold">₹{insights.safeToSpendDaily?.toLocaleString('en-IN') || '0'}</h3>
-              <p className="text-xs text-blue-100 mt-2 opacity-90 max-w-md">Calculated by reserving ₹{insights.upcomingBills?.toLocaleString('en-IN') || '0'} for upcoming subscriptions before month-end.</p>
+              <p className={`text-[10px] font-bold uppercase tracking-widest mb-1 flex items-center ${insights.hitsZero ? 'text-red-800 dark:text-red-400' : 'text-[#0A3D8B] dark:text-blue-300'}`}>
+                <Calendar className="w-3 h-3 mr-1"/> 30-Day Liquidity Forecast
+              </p>
+              <h3 className={`text-3xl font-bold ${insights.hitsZero ? 'text-red-900 dark:text-red-300' : 'text-[#0F172A] dark:text-gray-200'}`}>
+                ₹{insights.forecast30Days?.[29]?.projected_balance?.toLocaleString('en-IN') || '0'}
+              </h3>
+              <p className={`text-xs mt-1 ${insights.hitsZero ? 'text-red-700 dark:text-red-400/80' : 'text-gray-500 dark:text-blue-200'}`}>
+                Projected balance next month
+              </p>
             </div>
-            
-            {/* Impulse Deflector Mini-Tool */}
-            <div className="bg-white/10 dark:bg-black/20 p-4 rounded-xl backdrop-blur-sm w-full md:w-72 mt-auto">
-              <p className="text-[10px] font-bold text-blue-200 uppercase tracking-widest mb-2 flex items-center"><Target className="w-3 h-3 mr-1"/> Impulse Deflector</p>
-              <div className="flex space-x-2">
-                <input type="number" placeholder="Cost (₹)" value={impulseAmount} onChange={(e) => setImpulseAmount(e.target.value)} className="w-full bg-white/20 border border-white/10 rounded-lg px-3 py-2 text-xs text-white placeholder-blue-200 focus:outline-none focus:ring-1 focus:ring-white" />
-              </div>
-              {impulseAmount > 0 && (
-                <p className="text-[10px] font-medium text-orange-200 mt-2 leading-tight">
-                  This equates to <span className="font-bold">{(impulseAmount / (insights.safeToSpendDaily || 1)).toFixed(0)} days</span> of your safe spend limit.
+            <div className={`p-3 rounded-xl ${insights.hitsZero ? 'bg-red-100 dark:bg-red-900/40 text-red-600' : 'bg-white/50 dark:bg-[#0a0a0a]/50 text-[#0A3D8B] dark:text-blue-400'}`}>
+              {insights.hitsZero ? <AlertTriangle className="w-6 h-6" /> : <TrendingUp className="w-6 h-6" />}
+            </div>
+          </div>
+
+          <div className="mt-4">
+            {insights.hitsZero ? (
+              <div className="bg-red-100/50 dark:bg-red-900/20 p-3 rounded-lg border border-red-200 dark:border-red-800/30">
+                <p className="text-xs font-bold text-red-800 dark:text-red-300">
+                  CRITICAL: Liquidity Depletion Risk
                 </p>
-              )}
-            </div>
+                <p className="text-[11px] text-red-700 dark:text-red-400/80 mt-1">
+                  At your current burn rate of ₹{Math.abs(insights.netDailyVelocity || 0).toLocaleString('en-IN')}/day, you will run out of liquid cash in exactly <span className="font-bold">{insights.daysToZero} days</span>.
+                </p>
+              </div>
+            ) : (
+              <div className="bg-white/40 dark:bg-[#0a0a0a]/40 p-3 rounded-lg border border-blue-200/50 dark:border-[#262626]">
+                <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">
+                  Trajectory Safe
+                </p>
+                <p className="text-[11px] text-gray-600 dark:text-gray-400 mt-1">
+                  You are generating a net surplus of <span className="font-bold text-emerald-600 dark:text-emerald-400">₹{(insights.netDailyVelocity || 0).toLocaleString('en-IN')}/day</span>. Your upcoming liabilities are fully covered.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Grid of AI Insights */}
+      {/* --- ROW 2: ANOMALIES & OTHER INSIGHTS --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         
-        {/* Lifestyle Creep */}
-        {insights.creepPercentage > 5 ? (
-          <div className="bg-[#FFF0F0] dark:bg-[#3A1C1C] p-5 rounded-2xl border border-red-100 dark:border-red-900/30">
-            <ShieldAlert className="w-5 h-5 text-red-500 mb-3" />
-            <h4 className="text-sm font-bold text-red-900 dark:text-red-400 mb-1">Lifestyle Creep Detected</h4>
-            <p className="text-xs text-red-800/80 dark:text-red-300/80 leading-relaxed">Your 30-day spending is up {insights.creepPercentage}% vs your 90-day baseline.</p>
+        {/* Insight 9: Z-Score Anomaly Alerts */}
+        {insights.anomalies && insights.anomalies.length > 0 ? (
+          <div className="xl:col-span-2 bg-[#FFF0F0] dark:bg-[#3A1C1C] p-5 rounded-2xl border border-red-100 dark:border-red-900/30 shadow-sm">
+            <div className="flex items-center mb-4">
+              <ShieldAlert className="w-5 h-5 text-red-600 mr-2" />
+              <h4 className="text-sm font-bold text-red-900 dark:text-red-400">Unusual Spending Detected</h4>
+            </div>
+            <div className="space-y-3">
+              {insights.anomalies.map((tx, idx) => (
+                <div key={idx} className="bg-white/60 dark:bg-black/20 p-3 rounded-lg flex justify-between items-center border border-red-200/50 dark:border-red-900/20">
+                  <div>
+                    <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{tx.merchant}</p>
+                    <p className="text-[10px] text-red-700 dark:text-red-400/80 mt-0.5">
+                      <span className="font-bold">{tx.multiplier}x higher</span> than your normal average.
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold text-red-600 dark:text-red-400">
+                    ₹{tx.amount.toLocaleString('en-IN')}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         ) : (
-          <div className="bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30">
-            <Activity className="w-5 h-5 text-emerald-500 mb-3" />
-            <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-400 mb-1">Pacing Optimal</h4>
-            <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 leading-relaxed">Your discretionary burn rate is perfectly stabilized.</p>
+          <div className="xl:col-span-2 bg-emerald-50 dark:bg-emerald-900/10 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900/30 flex items-center shadow-sm">
+            <Activity className="w-8 h-8 text-emerald-500 mr-4 shrink-0" />
+            <div>
+              <h4 className="text-sm font-bold text-emerald-900 dark:text-emerald-400 mb-1">No Anomalies Detected</h4>
+              <p className="text-xs text-emerald-800/80 dark:text-emerald-300/80 leading-relaxed">All recent transactions fall within normal statistical bounds. No highly unusual spending events found.</p>
+            </div>
           </div>
         )}
 
-        {/* Tax Harvesting */}
+        {/* Existing: Tax Harvesting */}
         {insights.taxLossOpportunities?.length > 0 ? (
           <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
             <TrendingDown className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400 mb-3" />
@@ -147,19 +177,13 @@ const SmartInsightsWidget = ({ insights }) => {
           </div>
         )}
 
-        {/* Dividend Snowball */}
+        {/* Existing: Dividend Snowball */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
           <Coins className="w-5 h-5 text-yellow-500 mb-3" />
-          <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Dividend Snowball</h4>
-          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">You are pacing to generate <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{insights.annualDividends?.toLocaleString('en-IN') || '0'}</span> in passive income this year.</p>
+          <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Dividend Pacing</h4>
+          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Generating <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{insights.annualDividends?.toLocaleString('en-IN') || '0'}</span> in passive income this year.</p>
         </div>
 
-        {/* Portfolio Beta */}
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-          <Activity className="w-5 h-5 text-purple-500 mb-3" />
-          <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Portfolio Beta</h4>
-          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Your risk score is <span className={`font-bold ${parseFloat(insights.portfolioBeta) > 1.2 ? 'text-red-500' : 'text-emerald-500'}`}>{insights.portfolioBeta || '1.0'}</span>. {parseFloat(insights.portfolioBeta) > 1.2 ? 'High volatility detected.' : 'Market stable.'}</p>
-        </div>
       </div>
     </div>
   );

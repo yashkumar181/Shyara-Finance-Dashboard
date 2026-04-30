@@ -13,65 +13,113 @@ export default async function handler(req, res) {
 
   try {
     // ---------------------------------------------------------
-    // 1. FETCH HISTORICAL DATA (Last 6 Months)
+    // 1. FETCH HISTORICAL DATA 
     // ---------------------------------------------------------
-    // We group transactions by month and type to calculate stability
     const monthlyStats = await sql`
-      SELECT 
-        TO_CHAR(transaction_date, 'YYYY-MM') as month,
-        type,
-        SUM(amount) as total_amount
+      SELECT TO_CHAR(transaction_date, 'YYYY-MM') as month, type, SUM(amount) as total_amount
       FROM transactions 
-      WHERE user_id = ${uid} 
-        AND transaction_date >= NOW() - INTERVAL '6 months'
+      WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months'
       GROUP BY month, type
     `;
 
-    // Fetch active accounts for the Diversity Score
-    const accounts = await sql`SELECT account_category FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`;
+    const accounts = await sql`SELECT id, account_category, balance, account_type FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`;
+    
+    const recentTxns = await sql`
+      SELECT id, merchant, amount, transaction_date, type 
+      FROM transactions 
+      WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '60 days'
+    `;
 
     // ---------------------------------------------------------
-    // 2. INSIGHT 6: INCOME STABILITY INDEX & EXPENSE STABILITY
+    // 2. INSIGHT 1 & 6: CASH FLOW HEALTH & STABILITY
     // ---------------------------------------------------------
-    // Helper function to calculate Coefficient of Variation (CV = StdDev / Mean)
     const calculateCV = (dataArray) => {
-      if (dataArray.length === 0) return 1; // High variance if no data
+      if (dataArray.length === 0) return 1;
       const mean = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       if (mean === 0) return 1;
       const variance = dataArray.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / dataArray.length;
-      const stdDev = Math.sqrt(variance);
-      return stdDev / mean;
+      return Math.sqrt(variance) / mean;
     };
 
-    // Extract monthly totals
     const incomeTotals = monthlyStats.filter(row => row.type === 'income').map(row => parseFloat(row.total_amount));
     const expenseTotals = monthlyStats.filter(row => row.type === 'expense').map(row => parseFloat(row.total_amount));
 
-    // Calculate CVs
-    const incomeCV = calculateCV(incomeTotals);
-    const expenseCV = calculateCV(expenseTotals);
-
-    // Score out of 100
-    const incomeStabilityScore = 100 * (1 - Math.min(incomeCV, 1));
-    const expenseStabilityScore = 100 * (1 - Math.min(expenseCV, 1));
-
-    // ---------------------------------------------------------
-    // 3. INSIGHT 1: OVERALL CASH FLOW HEALTH SCORE
-    // ---------------------------------------------------------
-    // Account Diversity: Check unique account categories (bank, digital, card)
+    const incomeStabilityScore = 100 * (1 - Math.min(calculateCV(incomeTotals), 1));
+    const expenseStabilityScore = 100 * (1 - Math.min(calculateCV(expenseTotals), 1));
+    
     const uniqueCategories = new Set(accounts.map(a => a.account_category));
-    const diversityScore = (uniqueCategories.size / 4) * 100; // Assuming 4 ideal categories
-
-    // Final Weighted Health Score (40% Income, 30% Expense, 30% Diversity)
+    const diversityScore = (uniqueCategories.size / 4) * 100;
     const healthScore = Math.round((incomeStabilityScore * 0.4) + (expenseStabilityScore * 0.3) + (Math.min(diversityScore, 100) * 0.3));
 
-    // Return the payload to the frontend
+    // ---------------------------------------------------------
+    // 3. INSIGHT 4: 30-DAY BALANCE FORECAST (SMA Model)
+    // ---------------------------------------------------------
+    const liquidCash = accounts.filter(a => a.account_type !== 'credit_card').reduce((sum, a) => sum + parseFloat(a.balance), 0);
+    
+    // Calculate average daily burn rate over the last 60 days
+    const total60DayExpense = recentTxns.reduce((sum, t) => sum + parseFloat(t.amount), 0);
+    const avgDailyBurn = total60DayExpense / 60;
+    
+    // Calculate conservative income estimate (assume lowest recent month / 30)
+    const conservativeDailyIncome = incomeTotals.length > 0 ? Math.min(...incomeTotals) / 30 : 0;
+    const netDailyVelocity = conservativeDailyIncome - avgDailyBurn;
+
+    // Generate 30-day projection coordinates
+    let projectedBalance = liquidCash;
+    const forecast30Days = [];
+    let hitsZero = false;
+    let daysToZero = null;
+
+    for (let i = 1; i <= 30; i++) {
+      projectedBalance += netDailyVelocity;
+      forecast30Days.push({ day: i, projected_balance: Math.round(projectedBalance) });
+      
+      if (projectedBalance <= 0 && !hitsZero) {
+        hitsZero = true;
+        daysToZero = i;
+      }
+    }
+
+    // ---------------------------------------------------------
+    // 4. INSIGHT 9: SPENDING ANOMALY ALERTS (Z-Score Model)
+    // ---------------------------------------------------------
+    let anomalies = [];
+    if (recentTxns.length > 5) {
+      const expenses = recentTxns.map(t => parseFloat(t.amount));
+      const meanExpense = expenses.reduce((a, b) => a + b, 0) / expenses.length;
+      const variance = expenses.reduce((a, b) => a + Math.pow(b - meanExpense, 2), 0) / expenses.length;
+      const stdDev = Math.sqrt(variance);
+
+      // Flag if Z-Score > 2.5 (highly unusual)
+      anomalies = recentTxns.filter(t => {
+        const amount = parseFloat(t.amount);
+        const zScore = (amount - meanExpense) / (stdDev || 1);
+        return zScore > 2.5;
+      }).map(t => ({
+        id: t.id,
+        merchant: t.merchant || 'Unknown',
+        amount: parseFloat(t.amount),
+        date: t.transaction_date,
+        multiplier: (parseFloat(t.amount) / meanExpense).toFixed(1)
+      })).slice(0, 3); // Keep only top 3 to avoid UI clutter
+    }
+
+    // Return the combined payload
     res.status(200).json({
-      healthScore: healthScore,
+      healthScore,
       incomeStabilityScore: Math.round(incomeStabilityScore),
       expenseStabilityScore: Math.round(expenseStabilityScore),
       accountDiversityScore: Math.round(Math.min(diversityScore, 100)),
-      // ... we will append the other insights here in the next steps
+      
+      // New Insight 4 Payloads
+      liquidCash,
+      netDailyVelocity: Math.round(netDailyVelocity),
+      forecast30Days,
+      hitsZero,
+      daysToZero,
+
+      // New Insight 9 Payloads
+      anomalies
     });
 
   } catch (error) {
