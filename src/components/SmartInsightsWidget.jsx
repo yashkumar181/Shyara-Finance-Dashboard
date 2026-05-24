@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { BrainCircuit, ShieldAlert, TrendingDown, Coins, Activity, ArrowRight, Zap, Target, AlertTriangle, Calendar, TrendingUp } from 'lucide-react';
+import { BrainCircuit, ShieldAlert, TrendingDown, Coins, Activity, ArrowRight, Target, AlertTriangle, Calendar, TrendingUp, PieChart } from 'lucide-react';
 
 const SmartInsightsWidget = ({ insights }) => {
   const [impulseAmount, setImpulseAmount] = useState('');
@@ -16,7 +16,6 @@ const SmartInsightsWidget = ({ insights }) => {
     );
   }
 
-  // --- Insight 1 & 6: Health Score Variables ---
   const healthScore = insights.healthScore || 0;
   let healthColor = 'text-red-500';
   let healthStroke = 'stroke-red-500';
@@ -35,7 +34,6 @@ const SmartInsightsWidget = ({ insights }) => {
         <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 tracking-tight">Shyara Intelligence</h2>
       </div>
 
-      {/* --- ROW 1: HEALTH SCORE & 30-DAY FORECAST --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
         
         {/* Insight 1: Cash Flow Health Score */}
@@ -125,7 +123,6 @@ const SmartInsightsWidget = ({ insights }) => {
         </div>
       </div>
 
-      {/* --- ROW 2: ANOMALIES & OTHER INSIGHTS --- */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         
         {/* Insight 9: Z-Score Anomaly Alerts */}
@@ -161,27 +158,26 @@ const SmartInsightsWidget = ({ insights }) => {
           </div>
         )}
 
-        {/* Existing: Tax Harvesting */}
-        {insights.taxLossOpportunities?.length > 0 ? (
-          <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-            <TrendingDown className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400 mb-3" />
-            <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Tax Loss Harvesting</h4>
-            <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed mb-3">Sell {insights.taxLossOpportunities[0].name} to harvest ₹{insights.taxLossOpportunities[0].harvestable_loss.toLocaleString('en-IN')} in losses.</p>
-            <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-gray-400 uppercase tracking-widest flex items-center hover:underline">Review Strategy <ArrowRight className="w-3 h-3 ml-1" /></button>
-          </div>
-        ) : (
-          <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626] opacity-60">
-            <TrendingDown className="w-5 h-5 text-gray-400 mb-3" />
-            <h4 className="text-sm font-bold text-gray-500 mb-1">No Tax Losses</h4>
-            <p className="text-xs text-gray-400 leading-relaxed">Your portfolio is too profitable to harvest tax losses.</p>
-          </div>
-        )}
+        {/* Insight 2: Monthly Burn Rate Trend */}
+        <div className={`p-5 rounded-2xl border shadow-sm ${insights.burnRateTrend > 5 ? 'bg-[#FFF0F0] dark:bg-[#3A1C1C] border-red-100 dark:border-red-900/30' : 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30'}`}>
+          {insights.burnRateTrend > 5 ? <TrendingUp className="w-5 h-5 text-red-500 mb-3" /> : <TrendingDown className="w-5 h-5 text-emerald-500 mb-3" />}
+          <h4 className={`text-sm font-bold mb-1 ${insights.burnRateTrend > 5 ? 'text-red-900 dark:text-red-400' : 'text-emerald-900 dark:text-emerald-400'}`}>
+            {insights.burnRateMessage || "Burn Rate Trend"}
+          </h4>
+          <p className={`text-xs leading-relaxed ${insights.burnRateTrend > 5 ? 'text-red-800/80 dark:text-red-300/80' : 'text-emerald-800/80 dark:text-emerald-300/80'}`}>
+            Your monthly spending is trending <span className="font-bold">{insights.burnRateTrend > 0 ? '+' : ''}{insights.burnRateTrend}%</span> over the last 6 months.
+          </p>
+        </div>
 
-        {/* Existing: Dividend Snowball */}
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-          <Coins className="w-5 h-5 text-yellow-500 mb-3" />
-          <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Dividend Pacing</h4>
-          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Generating <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{insights.annualDividends?.toLocaleString('en-IN') || '0'}</span> in passive income this year.</p>
+        {/* Insight 8: Account Concentration Risk */}
+        <div className={`p-5 rounded-2xl border shadow-sm ${insights.concentrationRisk ? 'bg-[#FFF0F0] dark:bg-[#3A1C1C] border-red-100 dark:border-red-900/30' : 'bg-[#F8F9FA] dark:bg-[#121212] border-gray-200 dark:border-[#262626]'}`}>
+          {insights.concentrationRisk ? <AlertTriangle className="w-5 h-5 text-red-500 mb-3" /> : <PieChart className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400 mb-3" />}
+          <h4 className={`text-sm font-bold mb-1 ${insights.concentrationRisk ? 'text-red-900 dark:text-red-400' : 'text-[#0F172A] dark:text-gray-200'}`}>
+            {insights.concentrationRisk ? "Concentration Risk" : "Diversified Assets"}
+          </h4>
+          <p className={`text-xs leading-relaxed ${insights.concentrationRisk ? 'text-red-800/80 dark:text-red-300/80' : 'text-gray-500 dark:text-[#a3a3a3]'}`}>
+            <span className="font-bold">{insights.maxConcentration}%</span> of your liquid cash is concentrated in <span className="font-bold">{insights.highestAccountName}</span>.
+          </p>
         </div>
 
       </div>
