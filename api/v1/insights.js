@@ -12,6 +12,9 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
+    // ---------------------------------------------------------
+    // 1. FETCH HISTORICAL DATA
+    // ---------------------------------------------------------
     const monthlyStats = await sql`
       SELECT TO_CHAR(transaction_date, 'YYYY-MM') as month, type, SUM(amount) as total_amount
       FROM transactions 
@@ -20,7 +23,6 @@ export default async function handler(req, res) {
       ORDER BY month ASC
     `;
 
-    // NEW: Fetch weekly data for the line chart
     const weeklyStats = await sql`
       SELECT TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') as week, SUM(amount) as total_amount
       FROM transactions 
@@ -29,22 +31,18 @@ export default async function handler(req, res) {
     `;
 
     const accounts = await sql`SELECT id, account_category, balance, outstanding, account_type, nickname FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`;
-    
     const recentTxns = await sql`SELECT id, merchant, amount, transaction_date, type FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '60 days'`;
-
     const goals = await sql`SELECT id, name, target_amount, current_amount, icon FROM goals WHERE user_id = ${uid} AND current_amount < target_amount ORDER BY priority ASC, created_at DESC LIMIT 3`;
-
     const ccPayments = await sql`SELECT SUM(t.amount) as total_payments FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} AND a.account_type = 'credit_card' AND t.type = 'income' AND t.transaction_date >= NOW() - INTERVAL '6 months'`;
 
     // ---------------------------------------------------------
-    // MATH ENGINES 
+    // MATH ENGINES (Health, Anomalies, Forecast, Projections)
     // ---------------------------------------------------------
     const calculateCV = (dataArray) => {
       if (dataArray.length === 0) return 1;
       const mean = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       if (mean === 0) return 1;
-      const variance = dataArray.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / dataArray.length;
-      return Math.sqrt(variance) / mean;
+      return Math.sqrt(dataArray.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / dataArray.length) / mean;
     };
 
     const incomeTotals = monthlyStats.filter(row => row.type === 'income').map(row => parseFloat(row.total_amount));
@@ -102,8 +100,7 @@ export default async function handler(req, res) {
        return { name: g.name, remaining: Math.round(remaining), monthsToTarget: months, status };
     });
 
-    let burnRateTrend = 0;
-    let burnRateMessage = "Stable";
+    let burnRateTrend = 0; let burnRateMessage = "Stable";
     if (expenseTotals.length > 1) {
       const n = expenseTotals.length;
       let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
@@ -131,25 +128,56 @@ export default async function handler(req, res) {
     }
     const concentrationRisk = maxConcentration > 80;
 
-    // ---------------------------------------------------------
-    // MISSING GRAPH DATA INJECTED HERE
-    // ---------------------------------------------------------
     const burnRateHistory = {
-      monthly: monthlyStats.filter(r => r.type === 'expense').map(r => {
-        const date = new Date(r.month + '-01');
-        return { name: date.toLocaleDateString('en-US', { month: 'short' }), value: parseFloat(r.total_amount) };
-      }),
-      weekly: weeklyStats.map(r => {
-        return { name: new Date(r.week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: parseFloat(r.total_amount) };
-      })
+      monthly: monthlyStats.filter(r => r.type === 'expense').map(r => ({ name: new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'short' }), value: parseFloat(r.total_amount) })),
+      weekly: weeklyStats.map(r => ({ name: new Date(r.week).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }), value: parseFloat(r.total_amount) }))
     };
+
+    // ---------------------------------------------------------
+    // NEW: INSIGHT 10 - NET WORTH TRAJECTORY (3-Month Rolling)
+    // ---------------------------------------------------------
+    const monthlyFlows = {};
+    monthlyStats.forEach(r => {
+      if(!monthlyFlows[r.month]) monthlyFlows[r.month] = { income: 0, expense: 0, name: new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'short' }) };
+      monthlyFlows[r.month][r.type] += parseFloat(r.total_amount);
+    });
+    
+    const sortedMonths = Object.keys(monthlyFlows).sort();
+    const last3Months = sortedMonths.slice(-3);
+    
+    let nwGrowth3Month = 0;
+    let nwAcceleration = 0;
+    let last3MonthsData = [];
+
+    if (last3Months.length > 0) {
+      last3MonthsData = last3Months.map(m => {
+        const surplus = monthlyFlows[m].income - monthlyFlows[m].expense;
+        nwGrowth3Month += surplus;
+        return { month: monthlyFlows[m].name, surplus };
+      });
+
+      // Calculate acceleration if we have at least 3 months of data
+      if (last3MonthsData.length === 3) {
+        const prevAvg = (last3MonthsData[0].surplus + last3MonthsData[1].surplus) / 2;
+        const recent = last3MonthsData[2].surplus;
+        
+        if (prevAvg > 0) {
+           nwAcceleration = ((recent - prevAvg) / prevAvg) * 100;
+        } else if (prevAvg <= 0 && recent > 0) {
+           nwAcceleration = 100; // Complete turnaround from negative/zero to positive
+        } else if (prevAvg < 0 && recent < 0) {
+           nwAcceleration = ((recent - prevAvg) / Math.abs(prevAvg)) * 100; // Less negative is still growth
+        }
+      }
+    }
 
     res.status(200).json({
       healthScore, incomeStabilityScore: Math.round(incomeStabilityScore), expenseStabilityScore: Math.round(expenseStabilityScore), accountDiversityScore: Math.round(Math.min(diversityScore, 100)),
       liquidCash, netDailyVelocity: Math.round(netDailyVelocity), forecast30Days, hitsZero, daysToZero, anomalies,
       totalCCDebt: Math.round(totalCCDebt), debtPayoffMonths, avgMonthlySurplus: Math.round(avgMonthlySurplus), goalProjections,
       burnRateTrend: Math.round(burnRateTrend), burnRateMessage, maxConcentration: Math.round(maxConcentration), highestAccountName, concentrationRisk,
-      burnRateHistory // <-- Sending the raw graph data down to React
+      burnRateHistory,
+      nwGrowth3Month: Math.round(nwGrowth3Month), nwAcceleration: Math.round(nwAcceleration), last3MonthsData // Insight 10 Payload
     });
 
   } catch (error) {
