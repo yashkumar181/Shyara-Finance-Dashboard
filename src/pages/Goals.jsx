@@ -92,7 +92,7 @@ const Goals = () => {
 
     const newTotal = parseFloat(selectedGoalForFunds.current_amount) + amount;
 
-    try {
+    try { 
       await api.updateGoal({ id: selectedGoalForFunds.id, current_amount: newTotal });
       setGoals(safeGoals.map(g => {
         if (g.id === selectedGoalForFunds.id) {

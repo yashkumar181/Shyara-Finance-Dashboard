@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   Flame, PlaneTakeoff, Ghost, TrendingDown, AlertTriangle, 
-  Download, Activity, Target, RefreshCw, Clock, CheckCircle2, TrendingUp, BarChart3, ShieldCheck
+  Download, Activity, Target, RefreshCw, Clock, CheckCircle2, TrendingUp, BarChart3, ShieldCheck, Network
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApi } from '../lib/api';
@@ -76,7 +76,6 @@ const Insights = () => {
   const projectedAge = Math.round(currentAge + yearsToFire);
   const isPacingWell = projectedAge <= targetAge;
 
-  // Zero-Income Engine
   const safeAccounts = Array.isArray(accounts) ? accounts : [];
   const liquidCash = safeAccounts.filter(a => a.account_type !== 'credit_card').reduce((sum, a) => sum + parseFloat(a.balance || 0), 0);
   const runwayMonths = monthlySpend > 0 ? (liquidCash / monthlySpend).toFixed(1) : "99.9";
@@ -87,7 +86,6 @@ const Insights = () => {
   const payoffDate = new Date();
   if (debtMonths > 0) payoffDate.setMonth(payoffDate.getMonth() + debtMonths);
   const formattedPayoffDate = payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-
   const burnRateData = insights?.burnRateHistory?.[burnRateView] || [];
 
   return (
@@ -107,37 +105,21 @@ const Insights = () => {
 
       {/* --- F.I.R.E. ENGINE --- */}
       <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-6 md:p-10 rounded-2xl shadow-xl text-white mb-8 relative overflow-hidden border border-transparent dark:border-[#262626]">
-        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4 pointer-events-none">
-          <Flame className="w-64 h-64" />
-        </div>
+        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4 pointer-events-none"><Flame className="w-64 h-64" /></div>
         <div className="relative z-10 flex flex-col xl:flex-row justify-between gap-10">
           <div className="w-full xl:w-1/2">
             <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-2">
-                <Flame className="w-5 h-5 text-orange-400" />
-                <h2 className="text-sm font-bold tracking-widest uppercase text-blue-200">F.I.R.E. Projection</h2>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">Current Net Worth</p>
-                <p className="text-sm font-bold">₹{currentNetWorth.toLocaleString('en-IN')}</p>
-              </div>
+              <div className="flex items-center space-x-2"><Flame className="w-5 h-5 text-orange-400" /><h2 className="text-sm font-bold tracking-widest uppercase text-blue-200">F.I.R.E. Projection</h2></div>
+              <div className="text-right"><p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">Current Net Worth</p><p className="text-sm font-bold">₹{currentNetWorth.toLocaleString('en-IN')}</p></div>
             </div>
             <h3 className="text-4xl md:text-5xl font-bold mb-4">Age {yearsToFire === 99 ? '?' : projectedAge}</h3>
             <p className="text-sm text-blue-100 max-w-md leading-relaxed mb-6">Based on your target corpus of <span className="font-bold text-white">₹{fireCorpusTarget.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span> and a monthly savings rate of ₹{totalMonthlySavings.toLocaleString('en-IN')}, you will achieve total financial independence in {yearsToFire === 99 ? 'an undetermined amount of' : yearsToFire.toFixed(1)} years.</p>
-            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${isPacingWell ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}>
-              <Activity className="w-4 h-4 mr-2" /> {totalMonthlySavings <= 0 ? 'Increase savings to generate projection.' : isPacingWell ? 'On track for target retirement.' : 'Falling behind target retirement age.'}
-            </div>
+            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${isPacingWell ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}><Activity className="w-4 h-4 mr-2" /> {totalMonthlySavings <= 0 ? 'Increase savings to generate projection.' : isPacingWell ? 'On track for target retirement.' : 'Falling behind target retirement age.'}</div>
           </div>
           <div className="w-full xl:w-1/2 bg-white/10 dark:bg-black/20 p-6 rounded-2xl backdrop-blur-sm shadow-inner border border-white/5">
             <h4 className="text-sm font-bold mb-6 flex items-center"><Target className="w-4 h-4 mr-2" /> Scenario Simulator</h4>
-            <div className="mb-6">
-              <div className="flex justify-between text-xs font-bold mb-2"><span>Extra Monthly Savings</span><span className="text-blue-200">+ ₹{Number(extraSavings).toLocaleString('en-IN')}</span></div>
-              <input type="range" min="0" max="50000" step="1000" value={extraSavings} onChange={(e) => setExtraSavings(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" />
-            </div>
-            <div>
-              <div className="flex justify-between text-xs font-bold mb-2"><span>Target Retirement Age</span><span className="text-blue-200">Age {targetAge}</span></div>
-              <input type="range" min="35" max="65" step="1" value={targetAge} onChange={(e) => setTargetAge(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" />
-            </div>
+            <div className="mb-6"><div className="flex justify-between text-xs font-bold mb-2"><span>Extra Monthly Savings</span><span className="text-blue-200">+ ₹{Number(extraSavings).toLocaleString('en-IN')}</span></div><input type="range" min="0" max="50000" step="1000" value={extraSavings} onChange={(e) => setExtraSavings(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" /></div>
+            <div><div className="flex justify-between text-xs font-bold mb-2"><span>Target Retirement Age</span><span className="text-blue-200">Age {targetAge}</span></div><input type="range" min="35" max="65" step="1" value={targetAge} onChange={(e) => setTargetAge(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" /></div>
           </div>
         </div>
       </div>
@@ -146,10 +128,7 @@ const Insights = () => {
       <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] mb-8">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
           <div>
-            <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 flex items-center">
-              {insights?.burnRateTrend > 5 ? <TrendingUp className="w-5 h-5 mr-2 text-red-500" /> : <TrendingDown className="w-5 h-5 mr-2 text-emerald-500" />}
-              Burn Rate Velocity
-            </h3>
+            <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 flex items-center">{insights?.burnRateTrend > 5 ? <TrendingUp className="w-5 h-5 mr-2 text-red-500" /> : <TrendingDown className="w-5 h-5 mr-2 text-emerald-500" />} Burn Rate Velocity</h3>
             <p className="text-xs text-gray-500 mt-1">Your historical expense trajectory. Currently trending <span className={`font-bold ${insights?.burnRateTrend > 5 ? 'text-red-500' : 'text-emerald-500'}`}>{insights?.burnRateTrend > 0 ? '+' : ''}{insights?.burnRateTrend || 0}%</span>.</p>
           </div>
           <div className="flex bg-gray-200 dark:bg-[#1a1a1a] p-1 rounded-lg border border-gray-300 dark:border-[#262626]">
@@ -174,8 +153,50 @@ const Insights = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+      {/* --- NEW ROW: INSIGHT 3 (CLUSTERS) & INSIGHT 10 (WEALTH) --- */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
         
+        {/* Insight 3: ML Expense Clustering */}
+        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+                <Network className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Expense Clustering</h3>
+                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Auto-Categorized Spend</p>
+              </div>
+            </div>
+            <span className="text-[10px] font-bold bg-white dark:bg-[#262626] border border-gray-200 dark:border-gray-700 px-2 py-1 rounded text-gray-500 uppercase tracking-widest">AI Engine</span>
+          </div>
+
+          <div className="space-y-4">
+            {insights?.expenseClusters?.length > 0 ? (
+              insights.expenseClusters.map((cluster, idx) => (
+                <div key={idx} className="bg-white dark:bg-[#0a0a0a] p-4 rounded-xl border border-gray-100 dark:border-[#262626] shadow-sm">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200 capitalize">{cluster.primaryLabel.toLowerCase()}</p>
+                    <span className="text-sm font-bold text-[#0A3D8B] dark:text-blue-400">₹{cluster.totalAmount.toLocaleString('en-IN')}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {cluster.rawMerchants.map((merchant, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-gray-100 dark:bg-[#1a1a1a] text-gray-500 dark:text-[#a3a3a3] text-[9px] font-bold rounded uppercase border border-gray-200 dark:border-[#262626]">
+                        {merchant}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-32 flex flex-col items-center justify-center border-2 border-dashed border-gray-200 dark:border-[#262626] rounded-xl text-center px-4">
+                <p className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-1">Not enough data to cluster.</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">Log more expenses to see the AI automatically merge similar merchants.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
         {/* Insight 10: Net Worth Trajectory */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div>
@@ -188,7 +209,6 @@ const Insights = () => {
                 <p className="text-[10px] text-gray-500 uppercase tracking-widest">3-Month Rolling Velocity</p>
               </div>
             </div>
-
             <div className="flex flex-col mb-6">
               <span className={`text-4xl font-bold ${insights?.nwGrowth3Month >= 0 ? 'text-[#0F172A] dark:text-gray-200' : 'text-red-500'}`}>
                 {insights?.nwGrowth3Month > 0 ? '+' : ''}₹{(insights?.nwGrowth3Month || 0).toLocaleString('en-IN')}
@@ -196,102 +216,50 @@ const Insights = () => {
               <span className="text-xs text-gray-500 mt-1 font-medium">Net generated in the last 90 days</span>
             </div>
           </div>
-
           <div className="bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] rounded-xl p-5 shadow-inner">
             <div className="flex items-end justify-between h-20 mb-4 space-x-3">
                {insights?.last3MonthsData?.length > 0 ? insights.last3MonthsData.map((data, idx) => {
                   const max = Math.max(...insights.last3MonthsData.map(d => Math.abs(d.surplus)), 1);
                   const heightPct = Math.max((Math.abs(data.surplus) / max) * 100, 5);
-                  const isPositive = data.surplus >= 0;
                   return (
                      <div key={idx} className="flex flex-col items-center flex-1 h-full">
-                        <div className="w-full flex items-end justify-center h-full pb-2">
-                           <div className={`w-full max-w-[40px] rounded-t-sm transition-all duration-1000 ${isPositive ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ height: `${heightPct}%`, opacity: idx === 2 ? 1 : 0.4 }}></div>
-                        </div>
+                        <div className="w-full flex items-end justify-center h-full pb-2"><div className={`w-full max-w-[40px] rounded-t-sm transition-all duration-1000 ${data.surplus >= 0 ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ height: `${heightPct}%`, opacity: idx === 2 ? 1 : 0.4 }}></div></div>
                         <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">{data.month}</span>
                      </div>
                   )
-               }) : (
-                 <div className="w-full h-full flex items-center justify-center"><span className="text-xs text-gray-400">Not enough history.</span></div>
-               )}
+               }) : (<div className="w-full h-full flex items-center justify-center"><span className="text-xs text-gray-400">Not enough history.</span></div>)}
             </div>
-            
             <div className={`p-3 rounded-lg flex items-start space-x-3 ${insights?.nwAcceleration > 0 ? 'bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/20' : 'bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/20'}`}>
                {insights?.nwAcceleration > 0 ? <TrendingUp className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0"/> : <TrendingDown className="w-5 h-5 text-red-600 mt-0.5 shrink-0"/>}
-               <div>
-                 <p className={`text-sm font-bold ${insights?.nwAcceleration > 0 ? 'text-emerald-800 dark:text-emerald-400' : 'text-red-800 dark:text-red-400'}`}>
-                   {insights?.nwAcceleration > 0 ? 'Wealth Generation Accelerating' : 'Wealth Generation Decelerating'}
-                 </p>
-                 <p className={`text-[11px] mt-1 leading-relaxed ${insights?.nwAcceleration > 0 ? 'text-emerald-700/80 dark:text-emerald-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>
-                   Your recent savings velocity is <span className="font-bold">{Math.abs(insights?.nwAcceleration || 0).toFixed(1)}% {insights?.nwAcceleration > 0 ? 'higher' : 'lower'}</span> than your previous 60-day average.
-                 </p>
-               </div>
+               <div><p className={`text-sm font-bold ${insights?.nwAcceleration > 0 ? 'text-emerald-800 dark:text-emerald-400' : 'text-red-800 dark:text-red-400'}`}>{insights?.nwAcceleration > 0 ? 'Wealth Generation Accelerating' : 'Wealth Generation Decelerating'}</p><p className={`text-[11px] mt-1 leading-relaxed ${insights?.nwAcceleration > 0 ? 'text-emerald-700/80 dark:text-emerald-400/80' : 'text-red-700/80 dark:text-red-400/80'}`}>Your recent savings velocity is <span className="font-bold">{Math.abs(insights?.nwAcceleration || 0).toFixed(1)}% {insights?.nwAcceleration > 0 ? 'higher' : 'lower'}</span> than your previous 60-day average.</p></div>
             </div>
           </div>
         </div>
+      </div>
 
-        {/* --- NEW: INSIGHT 12 - LEDGER INTEGRITY SCANNER --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* --- INSIGHT 12: LEDGER INTEGRITY SCANNER --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-4 mb-6">
-              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Ledger Integrity</h3>
-                <p className="text-[10px] text-gray-500 uppercase tracking-widest">Circular Transfer Detection</p>
-              </div>
+              <div className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0"><ShieldCheck className="w-5 h-5" /></div>
+              <div><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Ledger Integrity</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest">Circular Transfer Detection</p></div>
             </div>
-
             {insights?.transferLoops?.length > 0 ? (
-              <>
-                <p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-4 leading-relaxed">
-                  We identified <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{(insights.loopVolume || 0).toLocaleString('en-IN')}</span> in self-transfers over the last 30 days. These have been flagged to prevent artificial inflation of your burn rate.
-                </p>
+              <><p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-4 leading-relaxed">We identified <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{(insights.loopVolume || 0).toLocaleString('en-IN')}</span> in self-transfers over the last 30 days. These have been flagged to prevent artificial inflation of your burn rate.</p>
                 <div className="space-y-3">
                   {insights.transferLoops.slice(0, 3).map((loop, idx) => (
                     <div key={idx} className="bg-white dark:bg-[#0a0a0a] p-3 rounded-xl border border-gray-100 dark:border-[#262626] shadow-sm flex justify-between items-center">
                       <div className="flex items-center space-x-3">
-                        <div className="flex flex-col items-center justify-center space-y-0.5 opacity-50">
-                          <div className="w-1.5 h-1.5 rounded-full bg-red-500"></div>
-                          <div className="w-0.5 h-2 bg-gray-300 dark:bg-gray-700"></div>
-                          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div>
-                        </div>
-                        <div>
-                          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{loop.from} → {loop.to}</p>
-                          <p className="text-xs text-gray-400 mt-0.5">{new Date(loop.date).toLocaleDateString()}</p>
-                        </div>
+                        <div className="flex flex-col items-center justify-center space-y-0.5 opacity-50"><div className="w-1.5 h-1.5 rounded-full bg-red-500"></div><div className="w-0.5 h-2 bg-gray-300 dark:bg-gray-700"></div><div className="w-1.5 h-1.5 rounded-full bg-emerald-500"></div></div>
+                        <div><p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{loop.from} → {loop.to}</p><p className="text-xs text-gray-400 mt-0.5">{new Date(loop.date).toLocaleDateString()}</p></div>
                       </div>
                       <span className="text-sm font-bold text-indigo-600 dark:text-indigo-400">₹{loop.amount.toLocaleString('en-IN')}</span>
                     </div>
                   ))}
-                </div>
-              </>
-            ) : (
-              <div className="flex flex-col items-center justify-center h-full text-center py-6">
-                <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full flex items-center justify-center mb-4">
-                   <ShieldCheck className="w-8 h-8 text-emerald-500" />
-                </div>
-                <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Ledger Optimized</h4>
-                <p className="text-xs text-gray-500 max-w-[200px] leading-relaxed">Zero circular self-transfers detected in the last 30 days. Your cash flow data is clean.</p>
-              </div>
-            )}
+                </div></>
+            ) : (<div className="flex flex-col items-center justify-center h-full text-center py-6"><div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-900/10 rounded-full flex items-center justify-center mb-4"><ShieldCheck className="w-8 h-8 text-emerald-500" /></div><h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Ledger Optimized</h4><p className="text-xs text-gray-500 max-w-[200px] leading-relaxed">Zero circular self-transfers detected in the last 30 days. Your cash flow data is clean.</p></div>)}
           </div>
-        </div>
-
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* --- ZERO INCOME RUNWAY --- */}
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
-          <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-6"><PlaneTakeoff className="w-6 h-6" /></div>
-          <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-2">Zero-Income Runway</h3>
-          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-6 leading-relaxed">If all income stopped today, your liquid cash reserves would cover your current burn rate for exactly:</p>
-          <div className="flex items-end space-x-2 mb-4">
-            <span className={`text-4xl font-bold ${runwayMonths < 3 ? 'text-red-500' : 'text-[#0F172A] dark:text-gray-200'}`}>{runwayMonths}</span>
-            <span className="text-sm font-bold text-gray-500 pb-1 uppercase tracking-widest">Months</span>
-          </div>
-          <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden"><div className={`h-full rounded-full ${runwayMonths >= 6 ? 'bg-emerald-500' : runwayMonths >= 3 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min((runwayMonths / 6) * 100, 100)}%` }}></div></div>
         </div>
 
         {/* --- DEBT PAYOFF TIMELINE --- */}
@@ -304,9 +272,7 @@ const Insights = () => {
                 <div className="flex items-end space-x-2 mb-4"><span className="text-4xl font-bold text-[#0F172A] dark:text-gray-200">{debtMonths}</span><span className="text-sm font-bold text-gray-500 pb-1 uppercase tracking-widest">Months</span></div>
                 <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full w-1/3"></div></div>
                 <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-2 uppercase tracking-wide">Projected Freedom: {formattedPayoffDate}</p></>
-            ) : (
-              <div className="bg-[#FFF0F0] dark:bg-[#3A1C1C] border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-start space-x-3 mt-4 shadow-sm"><AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" /><div><p className="text-sm font-bold text-red-900 dark:text-red-400">Debt Increasing</p><p className="text-xs text-red-800/80 mt-1 leading-relaxed">Your recent payments are insufficient to overcome your ₹{totalCCDebt.toLocaleString('en-IN')} debt.</p></div></div>
-            )
+            ) : (<div className="bg-[#FFF0F0] dark:bg-[#3A1C1C] border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-start space-x-3 mt-4 shadow-sm"><AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" /><div><p className="text-sm font-bold text-red-900 dark:text-red-400">Debt Increasing</p><p className="text-xs text-red-800/80 mt-1 leading-relaxed">Your recent payments are insufficient to overcome your ₹{totalCCDebt.toLocaleString('en-IN')} debt.</p></div></div>)
           ) : (<p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/20">Zero active credit card debt detected. Optimal efficiency achieved.</p>)}
         </div>
       </div>
@@ -315,10 +281,7 @@ const Insights = () => {
         {/* --- GOAL ACHIEVABILITY SCORE --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <div className="flex justify-between items-start mb-6">
-            <div className="flex items-center space-x-4">
-              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0"><Target className="w-5 h-5" /></div>
-              <div><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Goal Achievability</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest">Surplus velocity: <span className={`font-bold ${insights?.avgMonthlySurplus > 0 ? 'text-emerald-500' : 'text-red-500'}`}>₹{(insights?.avgMonthlySurplus || 0).toLocaleString('en-IN')}/mo</span></p></div>
-            </div>
+            <div className="flex items-center space-x-4"><div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0"><Target className="w-5 h-5" /></div><div><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Goal Achievability</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest">Surplus velocity: <span className={`font-bold ${insights?.avgMonthlySurplus > 0 ? 'text-emerald-500' : 'text-red-500'}`}>₹{(insights?.avgMonthlySurplus || 0).toLocaleString('en-IN')}/mo</span></p></div></div>
           </div>
           <div className="space-y-4">
             {insights?.goalProjections?.length > 0 ? (
