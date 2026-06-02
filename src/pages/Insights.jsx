@@ -17,7 +17,8 @@ const Insights = () => {
     preferences, updatePreference, insights 
   } = useAppStore();
 
-  const [isInitializing, setIsInitializing] = useState(!dashboard);
+  // Optimistic Cache Loading State
+  const [isInitializing, setIsInitializing] = useState(() => !localStorage.getItem('shyara_insights_cache'));
   const [isSilentlyRefreshing, setIsSilentlyRefreshing] = useState(false);
   const [burnRateView, setBurnRateView] = useState('monthly');
 
@@ -32,7 +33,16 @@ const Insights = () => {
 
   useEffect(() => {
     const fetchInsightsData = async () => {
-      if (dashboard) setIsSilentlyRefreshing(true);
+      // 1. Instantly pull the cached Insights from the browser
+      const cachedInsights = localStorage.getItem('shyara_insights_cache');
+      if (cachedInsights) {
+        useAppStore.getState().setInsights(JSON.parse(cachedInsights));
+        setIsInitializing(false); // Turn off full screen loader instantly
+      }
+
+      // 2. Start the silent background sync
+      setIsSilentlyRefreshing(true);
+
       try {
         const dashData = await api.getDashboard().catch(() => null);
         const accData = await api.getAccounts().catch(() => null);
@@ -44,7 +54,12 @@ const Insights = () => {
         if (accData) setAccounts(accData);
         if (subData) setSubscriptions(subData?.saved || []);
         if (goalData) setGoals(goalData);
-        if (insightsData) useAppStore.getState().setInsights(insightsData);
+        
+        // 3. Save new AI data to cache for the next time the user visits
+        if (insightsData) {
+            useAppStore.getState().setInsights(insightsData);
+            localStorage.setItem('shyara_insights_cache', JSON.stringify(insightsData));
+        }
         
       } catch (error) { console.error("Silent sync failed:", error); } 
       finally { setIsInitializing(false); setIsSilentlyRefreshing(false); }
@@ -68,7 +83,6 @@ const Insights = () => {
   const monthlySpend = safeDashboard.monthlySpent || 1; 
   const monthlyBudget = safeDashboard.monthlyBudget || 0;
 
-  // F.I.R.E Engine
   const annualSpend = monthlySpend * 12;
   const fireCorpusTarget = annualSpend * 25;
   const baseMonthlySavings = Math.max((monthlyBudget - monthlySpend), 0);
@@ -86,7 +100,6 @@ const Insights = () => {
   const debtMonths = insights?.debtPayoffMonths || 0;
   const payoffDate = new Date();
   if (debtMonths > 0) payoffDate.setMonth(payoffDate.getMonth() + debtMonths);
-  const formattedPayoffDate = payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   const burnRateData = insights?.burnRateHistory?.[burnRateView] || [];
 
   return (
@@ -104,7 +117,6 @@ const Insights = () => {
         </button>
       </div>
 
-      {/* --- F.I.R.E. ENGINE --- */}
       <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-6 md:p-10 rounded-2xl shadow-xl text-white mb-8 relative overflow-hidden border border-transparent dark:border-[#262626]">
         <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4 pointer-events-none"><Flame className="w-64 h-64" /></div>
         <div className="relative z-10 flex flex-col xl:flex-row justify-between gap-10">
@@ -125,7 +137,6 @@ const Insights = () => {
         </div>
       </div>
 
-      {/* --- BURN RATE VELOCITY GRAPH --- */}
       <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] mb-8">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 mb-8">
           <div>
@@ -154,9 +165,7 @@ const Insights = () => {
         </div>
       </div>
 
-      {/* --- CLUSTERS & WEALTH TRAJECTORY --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-        {/* Insight 3: ML Expense Clustering */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center space-x-4">
@@ -197,7 +206,6 @@ const Insights = () => {
           </div>
         </div>
 
-        {/* Insight 10: Net Worth Trajectory */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-4 mb-6">
@@ -238,7 +246,6 @@ const Insights = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-        {/* --- INSIGHT 12: LEDGER INTEGRITY SCANNER --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div>
             <div className="flex items-center space-x-4 mb-6">
@@ -262,7 +269,6 @@ const Insights = () => {
           </div>
         </div>
 
-        {/* --- ZERO INCOME RUNWAY --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-6"><PlaneTakeoff className="w-6 h-6" /></div>
           <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-2">Zero-Income Runway</h3>
@@ -276,7 +282,6 @@ const Insights = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* --- GOAL ACHIEVABILITY SCORE --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <div className="flex justify-between items-start mb-6">
             <div className="flex items-center space-x-4"><div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0"><Target className="w-5 h-5" /></div><div><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Goal Achievability</h3><p className="text-[10px] text-gray-500 uppercase tracking-widest">Surplus velocity: <span className={`font-bold ${insights?.avgMonthlySurplus > 0 ? 'text-emerald-500' : 'text-red-500'}`}>₹{(insights?.avgMonthlySurplus || 0).toLocaleString('en-IN')}/mo</span></p></div></div>
@@ -299,7 +304,6 @@ const Insights = () => {
           </div>
         </div>
 
-        {/* --- INSIGHT 5: ZOMBIE SUBSCRIPTIONS --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <div className="flex items-start space-x-4">
             <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">

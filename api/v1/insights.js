@@ -49,13 +49,26 @@ export default async function handler(req, res) {
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    const monthlyStats = await sql`SELECT TO_CHAR(transaction_date, 'YYYY-MM') as month, type, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY month, type ORDER BY month ASC`;
-    const weeklyStats = await sql`SELECT TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') as week, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '12 weeks' GROUP BY week ORDER BY week ASC`;
-    const allRecentTxns = await sql`SELECT id, merchant, amount, transaction_date, type FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '30 days' ORDER BY transaction_date DESC`;
-    const accounts = await sql`SELECT id, account_category, balance, outstanding, account_type, nickname FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`;
-    const recentTxns = await sql`SELECT id, merchant, amount, transaction_date, type FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '60 days'`;
-    const goals = await sql`SELECT id, name, target_amount, current_amount, icon FROM goals WHERE user_id = ${uid} AND current_amount < target_amount ORDER BY priority ASC, created_at DESC LIMIT 3`;
-    const ccPayments = await sql`SELECT SUM(t.amount) as total_payments FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} AND a.account_type = 'credit_card' AND t.type = 'income' AND t.transaction_date >= NOW() - INTERVAL '6 months'`;
+    // 🔥 PERF FIX: Fire all 8 database queries simultaneously using Promise.all
+    const [
+      monthlyStats,
+      weeklyStats,
+      allRecentTxns,
+      accounts,
+      recentTxns,
+      goals,
+      ccPayments,
+      confirmedSubs
+    ] = await Promise.all([
+      sql`SELECT TO_CHAR(transaction_date, 'YYYY-MM') as month, type, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY month, type ORDER BY month ASC`,
+      sql`SELECT TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') as week, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '12 weeks' GROUP BY week ORDER BY week ASC`,
+      sql`SELECT id, merchant, amount, transaction_date, type FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '30 days' ORDER BY transaction_date DESC`,
+      sql`SELECT id, account_category, balance, outstanding, account_type, nickname FROM accounts WHERE user_id = ${uid} AND is_active = TRUE`,
+      sql`SELECT id, merchant, amount, transaction_date, type, category FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '60 days'`,
+      sql`SELECT id, name, target_amount, current_amount, icon FROM goals WHERE user_id = ${uid} AND current_amount < target_amount ORDER BY priority ASC, created_at DESC LIMIT 3`,
+      sql`SELECT SUM(t.amount) as total_payments FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} AND a.account_type = 'credit_card' AND t.type = 'income' AND t.transaction_date >= NOW() - INTERVAL '6 months'`,
+      sql`SELECT merchant FROM recurring_payments WHERE user_id = ${uid}`
+    ]);
 
     // Health Math
     const calculateCV = (dataArray) => {
@@ -232,8 +245,7 @@ export default async function handler(req, res) {
 
     const allDetectedSubs = detectPatterns(recentTxns.map(t => ({ merchant: t.merchant, amount: parseFloat(t.amount), date: t.transaction_date, category: t.category })));
     
-    // CHANGED: Queries the new recurring_payments table to see if a merchant is already tracked
-    const confirmedSubs = await sql`SELECT merchant FROM recurring_payments WHERE user_id = ${uid}`;
+    // CHANGED: The confirmedSubs query was moved to the Promise.all array at the top!
     const confirmedSet = new Set(confirmedSubs.map(s => s.merchant?.toLowerCase()));
     const zombieSubscriptions = allDetectedSubs.filter(sub => !confirmedSet.has(sub.merchant.toLowerCase()));
 

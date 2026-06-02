@@ -93,11 +93,14 @@ export default async function handler(req, res) {
       return res.status(200).json({ saved: savedRaw, detected: newDetected });
     }
 
-    if (req.method === "POST") {
-      const { merchant, icon, category, amount, frequency, lastCharged, nextExpected, occurrences, confidence, totalSpent, status = "confirmed" } = req.body;
+if (req.method === "POST") {
+      // CHANGED: We now extract 'accountId' from the incoming request
+      const { merchant, icon, category, amount, frequency, lastCharged, nextExpected, occurrences, confidence, totalSpent, status = "confirmed", accountId } = req.body;
+      
+      // CHANGED: We insert account_id into the database
       const insertRaw = await sql`
-        INSERT INTO recurring_payments (user_id, merchant, icon, category, amount, frequency, last_charged, next_expected, occurrences, confidence, total_spent, status)
-        VALUES (${uid}, ${merchant}, ${icon || "💳"}, ${category || "Other"}, ${parseFloat(amount)}, ${frequency}, ${lastCharged || null}, ${nextExpected || null}, ${occurrences || 1}, ${confidence || 50}, ${parseFloat(totalSpent || amount)}, ${status})
+        INSERT INTO recurring_payments (user_id, merchant, icon, category, amount, frequency, last_charged, next_expected, occurrences, confidence, total_spent, status, account_id)
+        VALUES (${uid}, ${merchant}, ${icon || "💳"}, ${category || "Other"}, ${parseFloat(amount)}, ${frequency}, ${lastCharged || null}, ${nextExpected || null}, ${occurrences || 1}, ${confidence || 50}, ${parseFloat(totalSpent || amount)}, ${status}, ${accountId || null})
         RETURNING *
       `;
       return res.status(201).json(insertRaw[0]);
