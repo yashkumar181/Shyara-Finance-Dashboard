@@ -1,20 +1,54 @@
 import { getDb } from "../../lib/db.js";
 import { requireAuth, handleOptions } from "../../lib/auth.js";
 
+// --- Helpers for Insight 5 (Zombie Subscriptions) ---
+function classifyFrequency(avgDays) {
+  if (avgDays <= 9) return "weekly";
+  if (avgDays <= 35) return "monthly";
+  if (avgDays >= 80 && avgDays <= 100) return "quarterly";
+  if (avgDays >= 330) return "annual";
+  return "irregular";
+}
+
+function detectPatterns(transactions) {
+  const groups = {};
+  for (const tx of transactions) {
+    if (!tx.merchant) continue;
+    const key = `${tx.merchant.toLowerCase().trim()}::${Math.round(tx.amount / 10) * 10}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(tx);
+  }
+  const detected = [];
+  for (const txs of Object.values(groups)) {
+    if (txs.length < 2) continue;
+    const sorted = [...txs].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+    const intervals = [];
+    for (let i = 1; i < sorted.length; i++) {
+      intervals.push((new Date(sorted[i].date).getTime() - new Date(sorted[i - 1].date).getTime()) / 86400000);
+    }
+    const mean = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+    const variance = intervals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / intervals.length;
+    const cv = mean > 0 ? Math.sqrt(variance) / mean : 1;
+    const confidence = Math.round(Math.max(0, Math.min(100, (1 - cv) * 100)));
+    if (confidence < 40) continue; 
+    
+    const avgAmount = sorted.reduce((s, t) => s + t.amount, 0) / sorted.length;
+    detected.push({ merchant: sorted[0].merchant, amount: Math.round(avgAmount), frequency: classifyFrequency(mean) });
+  }
+  return detected;
+}
+
 export default async function handler(req, res) {
   if (handleOptions(req, res)) return;
   const auth = await requireAuth(req, res);
   if (!auth) return;
-
+  
   const sql = getDb();
   const uid = auth.dbUserId;
 
   if (req.method !== "GET") return res.status(405).json({ error: "Method not allowed" });
 
   try {
-    // ---------------------------------------------------------
-    // 1. FETCH HISTORICAL DATA
-    // ---------------------------------------------------------
     const monthlyStats = await sql`SELECT TO_CHAR(transaction_date, 'YYYY-MM') as month, type, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '6 months' GROUP BY month, type ORDER BY month ASC`;
     const weeklyStats = await sql`SELECT TO_CHAR(DATE_TRUNC('week', transaction_date), 'YYYY-MM-DD') as week, SUM(amount) as total_amount FROM transactions WHERE user_id = ${uid} AND type = 'expense' AND transaction_date >= NOW() - INTERVAL '12 weeks' GROUP BY week ORDER BY week ASC`;
     const allRecentTxns = await sql`SELECT id, merchant, amount, transaction_date, type FROM transactions WHERE user_id = ${uid} AND transaction_date >= NOW() - INTERVAL '30 days' ORDER BY transaction_date DESC`;
@@ -23,14 +57,13 @@ export default async function handler(req, res) {
     const goals = await sql`SELECT id, name, target_amount, current_amount, icon FROM goals WHERE user_id = ${uid} AND current_amount < target_amount ORDER BY priority ASC, created_at DESC LIMIT 3`;
     const ccPayments = await sql`SELECT SUM(t.amount) as total_payments FROM transactions t JOIN accounts a ON t.account_id = a.id WHERE t.user_id = ${uid} AND a.account_type = 'credit_card' AND t.type = 'income' AND t.transaction_date >= NOW() - INTERVAL '6 months'`;
 
-    // --- MATH ENGINES (Health, Anomalies, Forecast, Projections, Burn Rate, Concentration) ---
+    // Health Math
     const calculateCV = (dataArray) => {
       if (dataArray.length === 0) return 1;
       const mean = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
       if (mean === 0) return 1;
       return Math.sqrt(dataArray.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / dataArray.length) / mean;
     };
-
     const incomeTotals = monthlyStats.filter(row => row.type === 'income').map(row => parseFloat(row.total_amount));
     const expenseTotals = monthlyStats.filter(row => row.type === 'expense').map(row => parseFloat(row.total_amount));
     const incomeStabilityScore = 100 * (1 - Math.min(calculateCV(incomeTotals), 1));
@@ -70,19 +103,19 @@ export default async function handler(req, res) {
     if (totalCCDebt > 0 && avgMonthlyCCPayment > 0) debtPayoffMonths = Math.ceil(totalCCDebt / avgMonthlyCCPayment);
     else if (totalCCDebt > 0) debtPayoffMonths = -1;
 
-    const totalInc6m = incomeTotals.reduce((a, b) => a + b, 0);
-    const totalExp6m = expenseTotals.reduce((a, b) => a + b, 0);
+    const totalInc6m = incomeTotals.reduce((a,b) => a+b, 0);
+    const totalExp6m = expenseTotals.reduce((a,b) => a+b, 0);
     const avgMonthlySurplus = (totalInc6m - totalExp6m) / 6;
 
     const goalProjections = goals.map(g => {
-      const remaining = parseFloat(g.target_amount) - parseFloat(g.current_amount);
-      let months = -1; let status = 'Unrealistic';
-      if (avgMonthlySurplus > 0) {
-        months = Math.ceil(remaining / avgMonthlySurplus);
-        if (months <= 24) status = 'On Track';
-        else if (months <= 60) status = 'Challenging';
-      }
-      return { name: g.name, remaining: Math.round(remaining), monthsToTarget: months, status };
+       const remaining = parseFloat(g.target_amount) - parseFloat(g.current_amount);
+       let months = -1; let status = 'Unrealistic';
+       if (avgMonthlySurplus > 0) {
+           months = Math.ceil(remaining / avgMonthlySurplus);
+           if (months <= 24) status = 'On Track';
+           else if (months <= 60) status = 'Challenging';
+       }
+       return { name: g.name, remaining: Math.round(remaining), monthsToTarget: months, status };
     });
 
     let burnRateTrend = 0; let burnRateMessage = "Stable";
@@ -120,10 +153,10 @@ export default async function handler(req, res) {
 
     const monthlyFlows = {};
     monthlyStats.forEach(r => {
-      if (!monthlyFlows[r.month]) monthlyFlows[r.month] = { income: 0, expense: 0, name: new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'short' }) };
+      if(!monthlyFlows[r.month]) monthlyFlows[r.month] = { income: 0, expense: 0, name: new Date(r.month + '-01').toLocaleDateString('en-US', { month: 'short' }) };
       monthlyFlows[r.month][r.type] += parseFloat(r.total_amount);
     });
-
+    
     const sortedMonths = Object.keys(monthlyFlows).sort();
     const last3Months = sortedMonths.slice(-3);
     let nwGrowth3Month = 0; let nwAcceleration = 0; let last3MonthsData = [];
@@ -138,8 +171,8 @@ export default async function handler(req, res) {
         const prevAvg = (last3MonthsData[0].surplus + last3MonthsData[1].surplus) / 2;
         const recent = last3MonthsData[2].surplus;
         if (prevAvg > 0) nwAcceleration = ((recent - prevAvg) / prevAvg) * 100;
-        else if (prevAvg <= 0 && recent > 0) nwAcceleration = 100;
-        else if (prevAvg < 0 && recent < 0) nwAcceleration = ((recent - prevAvg) / Math.abs(prevAvg)) * 100;
+        else if (prevAvg <= 0 && recent > 0) nwAcceleration = 100; 
+        else if (prevAvg < 0 && recent < 0) nwAcceleration = ((recent - prevAvg) / Math.abs(prevAvg)) * 100; 
       }
     }
 
@@ -156,35 +189,26 @@ export default async function handler(req, res) {
       }
     }
 
-    // ---------------------------------------------------------
-    // NEW: INSIGHT 3 - ML EXPENSE CLUSTERING (Serverless Adapted)
-    // ---------------------------------------------------------
-    // Helper: Jaccard/Levenshtein Hybrid for fast string similarity
     const getSimilarity = (s1, s2) => {
       const a = (s1 || '').toLowerCase().replace(/[^a-z]/g, '');
       const b = (s2 || '').toLowerCase().replace(/[^a-z]/g, '');
       if (a === b) return 1;
-      if (a.includes(b) || b.includes(a)) return 0.8; // High score for substring matches (e.g. "Starbucks NY" and "Starbucks")
-      return 0;
+      if (a.includes(b) || b.includes(a)) return 0.8;
+      return 0; 
     };
 
     let expenseClusters = [];
     if (recentTxns.length > 0) {
       const clusters = [];
-
-      // Adapted algorithm: Group by Semantic String + Amount Proximity
       recentTxns.forEach(tx => {
         const amt = parseFloat(tx.amount);
         let foundCluster = false;
-
+        
         for (let c of clusters) {
-          // New "Semantic Override" Logic
           const maxSimilarity = Math.max(...c.rawMerchants.map(m => getSimilarity(m, tx.merchant)));
           const avgAmt = c.totalAmount / c.count;
-          const isAmountMatch = Math.abs(amt - avgAmt) / avgAmt < 0.5;
-
-          // If it's a 100% exact match, cluster it regardless of price (Handles the ₹2,000 Party vs ₹10 Chocolate).
-          // If it's just a fuzzy match (>0.7), require the prices to be similar (Protects against Apple Cafe vs Apple Store).
+          const isAmountMatch = Math.abs(amt - avgAmt) / avgAmt < 0.5; 
+          
           if (maxSimilarity === 1 || (maxSimilarity > 0.7 && isAmountMatch)) {
             c.totalAmount += amt;
             c.count += 1;
@@ -193,20 +217,25 @@ export default async function handler(req, res) {
             break;
           }
         }
-
+        
         if (!foundCluster) {
           clusters.push({
-            primaryLabel: tx.merchant || 'Unknown', // Serves as the Centroid
+            primaryLabel: tx.merchant || 'Unknown', 
             totalAmount: amt,
             count: 1,
             rawMerchants: [tx.merchant || 'Unknown']
           });
         }
       });
-
-      // Format for the UI: Sort by total amount, take top 4
       expenseClusters = clusters.sort((a, b) => b.totalAmount - a.totalAmount).slice(0, 4);
     }
+
+    const allDetectedSubs = detectPatterns(recentTxns.map(t => ({ merchant: t.merchant, amount: parseFloat(t.amount), date: t.transaction_date, category: t.category })));
+    
+    // CHANGED: Queries the new recurring_payments table to see if a merchant is already tracked
+    const confirmedSubs = await sql`SELECT merchant FROM recurring_payments WHERE user_id = ${uid}`;
+    const confirmedSet = new Set(confirmedSubs.map(s => s.merchant?.toLowerCase()));
+    const zombieSubscriptions = allDetectedSubs.filter(sub => !confirmedSet.has(sub.merchant.toLowerCase()));
 
     res.status(200).json({
       healthScore, incomeStabilityScore: Math.round(incomeStabilityScore), expenseStabilityScore: Math.round(expenseStabilityScore), accountDiversityScore: Math.round(Math.min(diversityScore, 100)),
@@ -215,7 +244,7 @@ export default async function handler(req, res) {
       burnRateTrend: Math.round(burnRateTrend), burnRateMessage, maxConcentration: Math.round(maxConcentration), highestAccountName, concentrationRisk,
       burnRateHistory, nwGrowth3Month: Math.round(nwGrowth3Month), nwAcceleration: Math.round(nwAcceleration), last3MonthsData,
       transferLoops, loopVolume: Math.round(loopVolume),
-      expenseClusters // Insight 3 Payload!
+      expenseClusters, zombieSubscriptions
     });
 
   } catch (error) {

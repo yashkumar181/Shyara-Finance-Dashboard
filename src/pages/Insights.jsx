@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Flame, PlaneTakeoff, Ghost, TrendingDown, AlertTriangle, 
   Download, Activity, Target, RefreshCw, Clock, CheckCircle2, TrendingUp, BarChart3, ShieldCheck, Network
@@ -9,6 +10,7 @@ import { useAppStore } from '../store/useAppStore';
 
 const Insights = () => {
   const api = useApi();
+  const navigate = useNavigate();
   const { 
     dashboard, setDashboard, accounts, setAccounts, 
     subscriptions, setSubscriptions, goals, setGoals,
@@ -40,7 +42,7 @@ const Insights = () => {
         
         if (dashData) setDashboard(dashData);
         if (accData) setAccounts(accData);
-        if (subData) setSubscriptions(subData);
+        if (subData) setSubscriptions(subData?.saved || []);
         if (goalData) setGoals(goalData);
         if (insightsData) useAppStore.getState().setInsights(insightsData);
         
@@ -80,7 +82,6 @@ const Insights = () => {
   const liquidCash = safeAccounts.filter(a => a.account_type !== 'credit_card').reduce((sum, a) => sum + parseFloat(a.balance || 0), 0);
   const runwayMonths = monthlySpend > 0 ? (liquidCash / monthlySpend).toFixed(1) : "99.9";
 
-  const activeSubs = Array.isArray(subscriptions) ? subscriptions.filter(s => s.status === 'active') : [];
   const totalCCDebt = insights?.totalCCDebt || 0;
   const debtMonths = insights?.debtPayoffMonths || 0;
   const payoffDate = new Date();
@@ -153,9 +154,8 @@ const Insights = () => {
         </div>
       </div>
 
-      {/* --- NEW ROW: INSIGHT 3 (CLUSTERS) & INSIGHT 10 (WEALTH) --- */}
+      {/* --- CLUSTERS & WEALTH TRAJECTORY --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 mb-6">
-        
         {/* Insight 3: ML Expense Clustering */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
           <div className="flex items-center justify-between mb-6">
@@ -262,18 +262,16 @@ const Insights = () => {
           </div>
         </div>
 
-        {/* --- DEBT PAYOFF TIMELINE --- */}
+        {/* --- ZERO INCOME RUNWAY --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
-          <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400 flex items-center justify-center mb-6"><TrendingDown className="w-6 h-6" /></div>
-          <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-2">Debt Payoff Timeline</h3>
-          {totalCCDebt > 0 ? (
-            debtMonths > 0 ? (
-              <><p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-6 leading-relaxed">Based on your recent payment velocity, your <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{totalCCDebt.toLocaleString('en-IN')}</span> in credit liabilities will be completely cleared in:</p>
-                <div className="flex items-end space-x-2 mb-4"><span className="text-4xl font-bold text-[#0F172A] dark:text-gray-200">{debtMonths}</span><span className="text-sm font-bold text-gray-500 pb-1 uppercase tracking-widest">Months</span></div>
-                <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden"><div className="h-full bg-purple-500 rounded-full w-1/3"></div></div>
-                <p className="text-[10px] font-bold text-purple-600 dark:text-purple-400 mt-2 uppercase tracking-wide">Projected Freedom: {formattedPayoffDate}</p></>
-            ) : (<div className="bg-[#FFF0F0] dark:bg-[#3A1C1C] border border-red-100 dark:border-red-900/30 p-4 rounded-xl flex items-start space-x-3 mt-4 shadow-sm"><AlertTriangle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" /><div><p className="text-sm font-bold text-red-900 dark:text-red-400">Debt Increasing</p><p className="text-xs text-red-800/80 mt-1 leading-relaxed">Your recent payments are insufficient to overcome your ₹{totalCCDebt.toLocaleString('en-IN')} debt.</p></div></div>)
-          ) : (<p className="text-xs text-emerald-600 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-900/10 p-4 rounded-xl border border-emerald-100 dark:border-emerald-900/20">Zero active credit card debt detected. Optimal efficiency achieved.</p>)}
+          <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center mb-6"><PlaneTakeoff className="w-6 h-6" /></div>
+          <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-2">Zero-Income Runway</h3>
+          <p className="text-xs text-gray-500 dark:text-[#a3a3a3] mb-6 leading-relaxed">If all income stopped today, your liquid cash reserves would cover your current burn rate for exactly:</p>
+          <div className="flex items-end space-x-2 mb-4">
+            <span className={`text-4xl font-bold ${runwayMonths < 3 ? 'text-red-500' : 'text-[#0F172A] dark:text-gray-200'}`}>{runwayMonths}</span>
+            <span className="text-sm font-bold text-gray-500 pb-1 uppercase tracking-widest">Months</span>
+          </div>
+          <div className="w-full h-2 bg-gray-200 dark:bg-gray-800 rounded-full overflow-hidden"><div className={`h-full rounded-full ${runwayMonths >= 6 ? 'bg-emerald-500' : runwayMonths >= 3 ? 'bg-yellow-500' : 'bg-red-500'}`} style={{ width: `${Math.min((runwayMonths / 6) * 100, 100)}%` }}></div></div>
         </div>
       </div>
 
@@ -301,13 +299,30 @@ const Insights = () => {
           </div>
         </div>
 
-        {/* --- ZOMBIE SUBSCRIPTIONS --- */}
+        {/* --- INSIGHT 5: ZOMBIE SUBSCRIPTIONS --- */}
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <div className="flex items-start space-x-4">
-            <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0"><Ghost className="w-5 h-5" /></div>
-            <div>
+            <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center shrink-0">
+              <Ghost className="w-5 h-5" />
+            </div>
+            <div className="flex-1">
               <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 mb-1">Zombie Subscriptions</h3>
-              {activeSubs.length > 4 ? (<p className="text-xs text-gray-500 leading-relaxed mt-2">You are maintaining {activeSubs.length} active subscriptions. Algorithms suggest a high probability of overlap. Canceling the bottom 2 could accelerate your goals by 4%.</p>) : (<p className="text-xs text-gray-500 leading-relaxed mt-2">Subscription payload is highly optimized. No wasted or duplicate recurring charges detected.</p>)}
+              {insights?.zombieSubscriptions?.length > 0 ? (
+                <>
+                  <p className="text-xs text-gray-500 leading-relaxed mt-2">
+                    The AI has detected <span className="font-bold text-orange-500">{insights.zombieSubscriptions.length}</span> hidden recurring charges 
+                    (like <span className="font-bold text-[#0F172A] dark:text-gray-200">{insights.zombieSubscriptions[0].merchant}</span>) that you haven't confirmed.
+                  </p>
+                  <button 
+                    onClick={() => navigate('/subscriptions')} 
+                    className="mt-4 px-4 py-2 bg-orange-50 dark:bg-orange-900/10 text-orange-700 dark:text-orange-400 text-xs font-bold rounded-lg border border-orange-200 dark:border-orange-800/30 hover:bg-orange-100 dark:hover:bg-orange-900/20 transition-colors"
+                  >
+                    Review & Cleanse
+                  </button>
+                </>
+              ) : (
+                <p className="text-xs text-gray-500 leading-relaxed mt-2">Subscription payload is highly optimized. No hidden recurring charges detected in your ledger.</p>
+              )}
             </div>
           </div>
         </div>
