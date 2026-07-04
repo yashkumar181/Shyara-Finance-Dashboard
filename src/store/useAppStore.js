@@ -31,10 +31,10 @@ export const useAppStore = create(
       dashboardLoading: false,
       dashboardError: null,
       setDashboard: (d) => set({
-          dashboard: d,
-          currentNetWorth: d?.netWorth || 0,
-          monthlyBudget: d?.monthlyBudget || 0,
-          monthlySpent: d?.monthlySpent || 0,
+        dashboard: d,
+        currentNetWorth: d?.netWorth || 0,
+        monthlyBudget: d?.monthlyBudget || 0,
+        monthlySpent: d?.monthlySpent || 0,
       }),
       setDashboardLoading: (v) => set({ dashboardLoading: v }),
       setDashboardError: (e) => set({ dashboardError: e }),
@@ -64,13 +64,10 @@ export const useAppStore = create(
       setBudgetLoading: (v) => set({ budgetLoading: v }),
 
       // --- INVESTMENTS STATE ---
-      investments: null,
-      investmentsLoading: false,
-      setInvestments: (i) => set({ investments: i }),
-      setInvestmentsLoading: (v) => set({ investmentsLoading: v }),
-
+      investments: [],
+      setInvestments: (data) => set({ investments: data }),
       // --- GOALS STATE ---
-      goals: null, 
+      goals: null,
       goalsLoading: false,
       setGoals: (g) => set({ goals: g }),
       setGoalsLoading: (v) => set({ goalsLoading: v }),
@@ -100,7 +97,7 @@ export const useAppStore = create(
         subscriptions: state.subscriptions,
         budget: state.budget,
         investments: state.investments,
-        goals: state.goals, 
+        goals: state.goals,
         currentNetWorth: state.currentNetWorth,
         monthlyBudget: state.monthlyBudget,
         monthlySpent: state.monthlySpent,

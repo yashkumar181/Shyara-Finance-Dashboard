@@ -51,10 +51,10 @@ export function createApiClient(getToken) {
     createBudgetCategory: (body) => post("/api/v1/budget", body),
     updateBudgetCategory: (id, monthlyLimit) => put(`/api/v1/budget?id=${id}`, { monthlyLimit }),
     deleteBudgetCategory: (id) => del(`/api/v1/budget?id=${id}`),
-    getInvestments: () => get("/api/v1/investments"),
-    createHolding: (body) => post("/api/v1/investments", body),
-    updateHolding: (id, body) => put(`/api/v1/investments?id=${id}`, body),
-    deleteHolding: (id) => del(`/api/v1/investments?id=${id}`),
+getInvestments: () => get("/api/v1/investments"),
+  createInvestment: (body) => post("/api/v1/investments", body),
+  deleteInvestment: (id) => del(`/api/v1/investments?id=${id}`),
+  deleteInvestmentTransaction: (txId) => del(`/api/v1/investments?transaction_id=${txId}`),
     purgeAllData: () => del("/api/v1/user/purge"), getGoals: () => get("/api/v1/goals"),
     createGoal: (body) => post("/api/v1/goals", body),
     updateGoal: (body) => put("/api/v1/goals", body),
@@ -63,8 +63,8 @@ export function createApiClient(getToken) {
     getInvestments: () => get("/api/v1/investments"),
     createInvestment: (body) => post("/api/v1/investments", body),
     deleteInvestment: (id) => del(`/api/v1/investments?id=${id}`),
-    syncInvestments: () => post("/api/v1/investments?action=sync"),
-
+// Add this line inside your return block in src/lib/api.js, under the Investments section:
+syncInvestments: () => post("/api/v1/investments/sync", {}),
   };
 }
 

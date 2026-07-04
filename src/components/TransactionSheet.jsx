@@ -247,7 +247,7 @@ const TransactionSheet = ({ isOpen, onClose }) => {
                     required value={formData.accountId} onChange={(e) => setFormData({...formData, accountId: e.target.value})}
                     className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer"
                   >
-                    <option value="cash" className="font-bold text-[#0A3D8B]">💵 Cash (Wallet/Physical)</option>
+                    <option value="cash" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm cursor-pointer">Cash (Wallet/Physical)</option>
                     {accountsList.map(acc => (
                       <option key={acc.id} value={acc.id}>{acc.nickname}</option>
                     ))}

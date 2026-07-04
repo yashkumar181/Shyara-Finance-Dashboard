@@ -1,420 +1,605 @@
 import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { 
-  TrendingUp, Wallet, Activity, PieChart, Building2, 
-  Plus, RefreshCw, X, Trash2, AlertTriangle, BrainCircuit, TrendingDown, Coins, ArrowRight
+  TrendingUp, TrendingDown, Plus, Wallet, PieChart, Trash2,
+  Building, Landmark, Shield, Bell, Calendar, Coins, ArrowUpRight, 
+  ArrowDownRight, CircleDollarSign, Gem, Activity, Search, Filter, X, AlertTriangle
 } from 'lucide-react';
-import AreaChart from '../components/charts/AreaChart';
+import { createPortal } from 'react-dom';
 import { useApi } from '../lib/api';
 import { useAppStore } from '../store/useAppStore';
 
 const Investments = () => {
   const api = useApi();
-  // Added setInsights here so we can save the data!
-  const { investments, setInvestments, investmentsLoading, setInvestmentsLoading, setDashboard, insights, setInsights } = useAppStore();
+  const { investments, setInvestments } = useAppStore();
   
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [assetToDelete, setAssetToDelete] = useState(null);
+  const [activeTab, setActiveTab] = useState('market');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All');
   
-  const [newAsset, setNewAsset] = useState({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedAssetHistory, setSelectedAssetHistory] = useState(null);
 
-  // Upgraded loader to fetch both Investments and AI Insights in parallel
-  const loadInvestments = async () => {
-    if (!useAppStore.getState().investments) setInvestmentsLoading(true);
+  // Custom Delete Confirmation Modal State
+  const [confirmDelete, setConfirmDelete] = useState({ 
+    isOpen: false, 
+    type: '', // 'asset' or 'transaction'
+    id: null, 
+    title: '', 
+    message: '' 
+  });
+
+  // Form State for logging investments
+  const [formData, setFormData] = useState({
+    action: 'Buy',
+    asset_class: 'market',
+    asset_type: 'Stock',
+    symbol: '',
+    name: '',
+    quantity: '',
+    price: '',
+    date: new Date().toISOString().split('T')[0]
+  });
+
+  const fetchInvestments = async () => {
     try {
-      const [invData, insData] = await Promise.all([
-        api.getInvestments(),
-        api.getInsights().catch(() => null) // Catch error so it doesn't break investments
-      ]);
-      setInvestments(Array.isArray(invData) ? invData : []);
-      if (insData) setInsights(insData);
-    } catch (err) {
-      setInvestments([]);
-    } finally {
-      setInvestmentsLoading(false);
+      const data = await api.getInvestments();
+      if (data) setInvestments(data);
+    } catch (error) {
+      console.error("Failed to fetch investments", error);
     }
   };
 
-  useEffect(() => { loadInvestments(); }, [api, setInvestments, setInvestmentsLoading, setInsights]);
+  useEffect(() => {
+    fetchInvestments();
+  }, [api]);
 
-  const handleSync = async () => {
-    setIsSyncing(true);
-    try {
-      const updatedData = await api.syncInvestments();
-      if (updatedData && updatedData.error) {
-         alert("Market Sync Failed: " + updatedData.error);
-      } else {
-         setInvestments(Array.isArray(updatedData) ? updatedData : []);
-         // Also refresh dashboard and insights after sync
-         const [freshDashboard, freshInsights] = await Promise.all([
-           api.getDashboard().catch(() => null),
-           api.getInsights().catch(() => null)
-         ]);
-         if (freshDashboard) setDashboard(freshDashboard);
-         if (freshInsights) setInsights(freshInsights);
-      }
-    } catch (err) {
-      alert("Network error: Failed to reach market data servers.");
-    } finally {
-      setIsSyncing(false);
-    }
-  };
+  const safeInvestments = Array.isArray(investments) ? investments : [];
 
+  const rawMarketAssets = safeInvestments.filter(i => i.asset_class === 'market');
+  const commodities = safeInvestments.filter(i => i.asset_class === 'commodity');
+  const realEstate = safeInvestments.filter(i => i.asset_class === 'real_estate');
+  const fixedIncome = safeInvestments.filter(i => i.asset_class === 'fixed_income');
+  const insurance = safeInvestments.filter(i => i.asset_class === 'insurance');
+
+  const marketAssets = rawMarketAssets.map(asset => {
+    const pnl = (asset.currentPrice - asset.avgPrice) * asset.quantity;
+    const pnlPct = asset.avgPrice > 0 ? ((asset.currentPrice - asset.avgPrice) / asset.avgPrice) * 100 : 0;
+    return { ...asset, pnl, pnlPct: pnlPct.toFixed(2) };
+  });
+
+  const filteredMarketAssets = marketAssets.filter(asset => {
+    const matchesSearch = asset.name.toLowerCase().includes(searchQuery.toLowerCase()) || (asset.symbol && asset.symbol.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesType = typeFilter === 'All' || asset.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  // Calculate Global Balances
+  const totalValue = safeInvestments.reduce((sum, inv) => sum + (inv.currentPrice * inv.quantity), 0);
+  const totalInvested = safeInvestments.reduce((sum, inv) => sum + (inv.avgPrice * inv.quantity), 0);
+  const overallReturn = totalValue - totalInvested;
+  const overallReturnPct = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+
+  // Realized P&L (LAST 12 MONTHS)
+  const twelveMonthsAgo = new Date();
+  twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+  const realizedPnL12Months = safeInvestments.reduce((totalPnL, asset) => {
+    const assetRealized = (asset.history || [])
+      .filter(tx => tx.action === 'Sell' && new Date(tx.date) >= twelveMonthsAgo)
+      .reduce((sum, tx) => sum + (tx.pnl || 0), 0);
+    return totalPnL + assetRealized;
+  }, 0);
+
+  // Handlers
   const handleAddAsset = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
-      const added = await api.createInvestment(newAsset);
-      setInvestments([added, ...(investments || [])]);
-      setIsAddOpen(false);
-      setNewAsset({ name: '', ticker_symbol: '', asset_type: 'stock', quantity: '', average_buy_price: '' });
-      const freshDashboard = await api.getDashboard();
-      if (freshDashboard) setDashboard(freshDashboard);
-      
-      // Refresh insights to include new asset
-      const freshInsights = await api.getInsights();
-      if (freshInsights) setInsights(freshInsights);
-    } catch (err) { alert("Failed to add asset."); }
+      await api.createInvestment(formData);
+      await fetchInvestments();
+      setIsAddModalOpen(false);
+      setFormData({ action: 'Buy', asset_class: 'market', asset_type: 'Stock', symbol: '', name: '', quantity: '', price: '', date: new Date().toISOString().split('T')[0] });
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to submit execution details.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const confirmDelete = async () => {
-    if (!assetToDelete) return;
-    try {
-      await api.deleteInvestment(assetToDelete);
-      setInvestments((investments || []).filter(a => a.id !== assetToDelete));
-      setAssetToDelete(null);
-      const freshDashboard = await api.getDashboard();
-      if (freshDashboard) setDashboard(freshDashboard);
-      
-      // Refresh insights to reflect deleted asset
-      const freshInsights = await api.getInsights();
-      if (freshInsights) setInsights(freshInsights);
-    } catch (err) {}
+  // Prepares the custom modal for Full Asset Deletion
+  const triggerDeleteAsset = (assetId, assetName) => {
+    setConfirmDelete({
+      isOpen: true,
+      type: 'asset',
+      id: assetId,
+      title: 'Wipe Asset Position?',
+      message: `Are you absolutely sure you want to completely purge ${assetName || 'this asset'} and all of its associated transaction logs? This action cannot be undone.`
+    });
   };
 
-  if (investmentsLoading && !investments) {
-    return <div className="flex-1 p-10 flex items-center justify-center animate-pulse text-gray-400 dark:text-[#a3a3a3] font-bold tracking-widest uppercase text-sm">Syncing Portfolio...</div>;
-  }
+  // Prepares the custom modal for Single Transaction Deletion
+  const triggerDeleteTransaction = (txId) => {
+    setConfirmDelete({
+      isOpen: true,
+      type: 'transaction',
+      id: txId,
+      title: 'Delete Execution Record?',
+      message: 'Are you sure you want to delete this specific historical execution record? The asset\'s average buy price and total quantity will automatically adjust.'
+    });
+  };
 
-  const safeAssets = Array.isArray(investments) ? investments : [];
-  const totalInvested = safeAssets.reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.average_buy_price)), 0);
-  const currentValue = safeAssets.reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
-  const totalGain = currentValue - totalInvested;
-  const totalRoi = totalInvested > 0 ? (totalGain / totalInvested) * 100 : 0;
+  // Actually fires the API based on what the custom modal confirmed
+  const executeDelete = async () => {
+    try {
+      if (confirmDelete.type === 'asset') {
+        await api.deleteInvestment(confirmDelete.id);
+        setSelectedAssetHistory(null);
+      } else if (confirmDelete.type === 'transaction') {
+        await api.deleteInvestmentTransaction(confirmDelete.id);
+        setSelectedAssetHistory(null);
+      }
+      await fetchInvestments();
+    } catch (err) {
+      console.error("Deletion failure", err);
+      alert("Failed to delete record. Please check the console.");
+    } finally {
+      setConfirmDelete({ isOpen: false, type: '', id: null, title: '', message: '' });
+    }
+  };
 
-  const stockValue = safeAssets.filter(a => a.asset_type === 'stock').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
-  const mfValue = safeAssets.filter(a => a.asset_type === 'mf').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
-  const cryptoValue = safeAssets.filter(a => a.asset_type === 'crypto').reduce((sum, a) => sum + (parseFloat(a.quantity) * parseFloat(a.current_price)), 0);
-
-  const stockPct = currentValue > 0 ? (stockValue / currentValue) * 100 : 0;
-  const mfPct = currentValue > 0 ? (mfValue / currentValue) * 100 : 0;
-  const cryptoPct = currentValue > 0 ? (cryptoValue / currentValue) * 100 : 0;
-
-  const chartData = [
-    { label: 'Jan', income: totalInvested * 0.8, expense: totalInvested * 0.82 },
-    { label: 'Feb', income: totalInvested * 0.9, expense: totalInvested * 0.95 },
-    { label: 'Mar', income: totalInvested * 0.95, expense: totalInvested * 0.98 },
-    { label: 'Apr', income: totalInvested, expense: currentValue }
-  ];
+  const TabButton = ({ id, label, icon: Icon }) => (
+    <button 
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center px-5 py-3 text-sm font-bold rounded-xl transition-all ${
+        activeTab === id 
+          ? 'bg-[#0A3D8B] dark:bg-blue-600 text-white shadow-md' 
+          : 'bg-white dark:bg-[#1a1a1a] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#262626] hover:bg-gray-50 dark:hover:bg-[#262626]'
+      }`}
+    >
+      <Icon className="w-4 h-4 mr-2" />
+      {label}
+    </button>
+  );
 
   return (
-    <div className="flex-1 overflow-auto p-4 md:p-10 pb-28 md:pb-10 relative">
-      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
+    <div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">
+      
+      {/* HEADER & OVERVIEW CARDS */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Investment Portfolio</h1>
-          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Tracking across {safeAssets.length} active assets</p>
+          <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Wealth Portfolio</h1>
+          <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Track and manage your multi-asset investments.</p>
         </div>
-        <div className="flex space-x-3">
-          <button onClick={() => setIsAddOpen(true)} className="flex items-center px-4 py-2 bg-[#F8F9FA] dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-100 dark:hover:bg-[#1E1E1E] transition-colors shadow-sm">
-            <Plus className="w-4 h-4 mr-2" /> Add Asset
-          </button>
-          <button onClick={handleSync} disabled={isSyncing} className="flex items-center px-4 py-2 bg-[#0A3D8B] dark:bg-gray-700 text-white rounded-lg text-xs font-semibold hover:bg-[#082f6b] dark:hover:bg-gray-600 transition-colors shadow-sm disabled:opacity-70">
-            <RefreshCw className={`w-4 h-4 mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
-            {isSyncing ? 'Syncing Market...' : 'Sync Market Prices'}
-          </button>
-        </div>
-      </div>
-
-      {/* PORTFOLIO INTELLIGENCE SECTION */}
-      <div className="mb-8">
-        <div className="flex items-center space-x-2 mb-4">
-          <BrainCircuit className="w-4 h-4 text-[#0A3D8B] dark:text-blue-400" />
-          <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 tracking-tight uppercase">Portfolio Intelligence</h2>
-        </div>
-
-        {!insights ? (
-          <div className="p-6 bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-[#262626] flex items-center space-x-4 animate-pulse">
-            <BrainCircuit className="w-6 h-6 text-[#0A3D8B] dark:text-blue-500" />
-            <div>
-              <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Analyzing Portfolio...</h2>
-              <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">Crunching live market data for insights.</p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {insights.taxLossOpportunities?.length > 0 ? (
-              <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-                <TrendingDown className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400 mb-3" />
-                <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Tax Loss Harvesting</h4>
-                <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed mb-3">Sell {insights.taxLossOpportunities[0].name} to harvest ₹{insights.taxLossOpportunities[0].harvestable_loss.toLocaleString('en-IN')} in losses.</p>
-                <button className="text-[10px] font-bold text-[#0A3D8B] dark:text-gray-400 uppercase tracking-widest flex items-center hover:underline">Review Strategy <ArrowRight className="w-3 h-3 ml-1" /></button>
-              </div>
-            ) : (
-              <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626] opacity-60">
-                <TrendingDown className="w-5 h-5 text-gray-400 mb-3" />
-                <h4 className="text-sm font-bold text-gray-500 mb-1">No Tax Losses</h4>
-                <p className="text-xs text-gray-400 leading-relaxed">Your portfolio is too profitable to harvest tax losses.</p>
-              </div>
-            )}
-
-            <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-              <Coins className="w-5 h-5 text-yellow-500 mb-3" />
-              <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Dividend Snowball</h4>
-              <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Pacing to generate <span className="font-bold text-[#0F172A] dark:text-gray-200">₹{insights.annualDividends?.toLocaleString('en-IN') || '0'}</span> in passive income this year.</p>
-            </div>
-
-            <div className="bg-[#F8F9FA] dark:bg-[#121212] p-5 rounded-2xl border border-gray-200 dark:border-[#262626]">
-              <Activity className="w-5 h-5 text-purple-500 mb-3" />
-              <h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Portfolio Beta</h4>
-              <p className="text-xs text-gray-500 dark:text-[#a3a3a3] leading-relaxed">Risk score is <span className={`font-bold ${parseFloat(insights.portfolioBeta) > 1.2 ? 'text-red-500' : 'text-emerald-500'}`}>{insights.portfolioBeta || '1.0'}</span>. {parseFloat(insights.portfolioBeta) > 1.2 ? 'High volatility detected.' : 'Market stable.'}</p>
-            </div>
-          </div>
-        )}
+        <button 
+          onClick={() => setIsAddModalOpen(true)}
+          className="flex items-center px-5 py-2.5 bg-[#0F172A] dark:bg-gray-200 text-white dark:text-[#0F172A] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-opacity"
+        >
+          <Plus className="w-4 h-4 mr-2" /> Add Asset
+        </button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-6 rounded-2xl shadow-md text-white relative overflow-hidden flex flex-col justify-between h-40 border border-transparent dark:border-[#262626]">
-          <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4 pointer-events-none">
-            <Wallet className="w-48 h-48" strokeWidth={1} />
-          </div>
-          <div className="relative z-10">
-            <p className="text-[10px] font-bold text-blue-200 tracking-widest uppercase mb-1">Current Value</p>
-            <h3 className="text-3xl lg:text-4xl font-bold mb-3 dark:text-gray-100">₹{currentValue.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
-            <div className="flex items-center space-x-2">
-              <span className="bg-white/20 text-white text-[10px] font-bold px-2 py-1 rounded flex items-center">
-                <TrendingUp className="w-3 h-3 mr-1" /> {totalGain >= 0 ? '+' : ''}₹{totalGain.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
-              </span>
-              <span className="text-[10px] text-blue-200">Total Unrealized</span>
-            </div>
-          </div>
+        <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-6 rounded-2xl shadow-lg border border-transparent dark:border-[#262626] text-white relative overflow-hidden">
+          <div className="absolute -right-4 -top-4 opacity-10"><Wallet className="w-32 h-32" /></div>
+          <p className="text-[10px] uppercase tracking-widest font-bold text-blue-200 mb-2">Total Net Portfolio</p>
+          <h2 className="text-3xl font-bold mb-1">₹{totalValue.toLocaleString('en-IN')}</h2>
+          <p className="text-sm text-blue-200">Across all asset classes</p>
+        </div>
+        
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Day's P&L (Markets)</p>
+          <div className="flex items-end space-x-2"><h2 className={`text-2xl font-bold text-gray-400`}>Data Syncing...</h2></div>
+          <div className={`inline-flex items-center mt-2 px-2 py-1 rounded bg-opacity-20 text-xs font-bold bg-gray-100 text-gray-500`}>Awaiting live feed integration</div>
         </div>
 
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-40">
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Total Invested</p>
-            <h3 className="text-2xl lg:text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹{totalInvested.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</h3>
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Overall Unrealized ROI</p>
+          <div className="flex items-end space-x-2">
+            <h2 className={`text-2xl font-bold ${overallReturn >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+              {overallReturn >= 0 ? '+' : ''}₹{overallReturn.toLocaleString('en-IN')}
+            </h2>
           </div>
-          <div className="flex justify-between items-end">
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Cash Basis</p>
-            <Wallet className="w-5 h-5 text-[#0A3D8B] dark:text-gray-400" />
-          </div>
-        </div>
-
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between h-40">
-          <div>
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase mb-1">Absolute ROI</p>
-            <h3 className={`text-2xl lg:text-3xl font-bold ${totalRoi >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{totalRoi.toFixed(2)}%</h3>
-          </div>
-          <div className="flex justify-between items-end">
-            <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Portfolio Yield</p>
-            <Activity className={`w-5 h-5 ${totalRoi >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`} />
+          <div className={`inline-flex items-center mt-2 px-2 py-1 rounded bg-opacity-20 text-xs font-bold ${overallReturn >= 0 ? 'bg-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-red-500 text-red-600 dark:text-red-400'}`}>
+            {overallReturn >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}
+            {overallReturnPct.toFixed(2)}% Total Yield
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
-        <div className="xl:col-span-2 bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
-          <div className="flex justify-between items-start mb-6">
-            <div>
-              <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200 mb-1">Holdings Performance</h2>
-              <p className="text-xs text-gray-500 dark:text-[#a3a3a3]">P&L trajectory against initial capital</p>
-            </div>
-            <div className="flex items-center space-x-4 text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-wider">
-              <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-slate-400 mr-2"></div>INVESTED</div>
-              <div className="flex items-center"><div className="w-2 h-2 rounded-full bg-emerald-500 mr-2"></div>CURRENT</div>
-            </div>
-          </div>
-          <AreaChart data={chartData} />
-        </div>
-
-        <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Asset Allocation</h2>
-            <PieChart className="w-4 h-4 text-gray-400" />
-          </div>
-          <div className="flex-1 flex flex-col items-center justify-center">
-            <div className="relative w-48 h-48 mb-6">
-              <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#3b82f6" strokeWidth="4" strokeDasharray={`${stockPct} ${100 - stockPct}`} strokeDashoffset="0"></circle>
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#8b5cf6" strokeWidth="4" strokeDasharray={`${mfPct} ${100 - mfPct}`} strokeDashoffset={`-${stockPct}`}></circle>
-                <circle cx="18" cy="18" r="15.9155" fill="transparent" stroke="#f59e0b" strokeWidth="4" strokeDasharray={`${cryptoPct} ${100 - cryptoPct}`} strokeDashoffset={`-${stockPct + mfPct}`}></circle>
-              </svg>
-              <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-center mt-1">
-                <span className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] tracking-widest uppercase">Total</span>
-                <span className="block text-xl font-bold text-[#0F172A] dark:text-gray-200">{safeAssets.length} Assets</span>
-              </div>
-            </div>
-            <div className="w-full space-y-3">
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-blue-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Stocks & ETFs</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">{stockPct.toFixed(1)}%</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-violet-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Mutual Funds</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">{mfPct.toFixed(1)}%</span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <div className="flex items-center"><div className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-3"></div><span className="text-gray-600 dark:text-[#a3a3a3] font-semibold">Crypto / Other</span></div>
-                <span className="font-bold text-[#0F172A] dark:text-gray-200">{cryptoPct.toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* TAB NAVIGATION */}
+      <div className="flex flex-wrap gap-3 mb-6">
+        <TabButton id="market" label="Markets & Crypto" icon={Activity} />
+        <TabButton id="commodities" label="Commodities" icon={Gem} />
+        <TabButton id="real_estate" label="Real Estate" icon={Building} />
+        <TabButton id="fixed_income" label="Fixed Income & Safety" icon={Shield} />
       </div>
 
-      <div className="bg-[#F8F9FA] dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden mb-8">
-        <div className="p-6 flex flex-col sm:flex-row justify-between sm:items-center border-b border-gray-200 dark:border-[#262626] gap-4">
-          <h3 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Active Holdings</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left min-w-[900px]">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-[#262626] bg-gray-100 dark:bg-[#0a0a0a]">
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest">Asset & Ticker</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Quantity</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Avg Price</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Current Price</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">Total Value</th>
-                <th className="px-6 py-4 text-[9px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest text-right">P&L</th>
-                <th className="px-6 py-4"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-[#262626]">
-              {safeAssets.map((item) => {
-                const qty = parseFloat(item.quantity);
-                const avgPrice = parseFloat(item.average_buy_price);
-                const curPrice = parseFloat(item.current_price);
-                
-                const invested = qty * avgPrice;
-                const value = qty * curPrice;
-                const pl = value - invested;
-                const plPct = invested > 0 ? (pl / invested) * 100 : 0;
-                
-                const isPositive = pl >= 0;
-
-                return (
-                  <tr key={item.id} className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
-                    <td className="px-6 py-5 flex items-center space-x-4">
-                      <div className="w-10 h-10 rounded-lg bg-gray-100 dark:bg-[#262626] flex items-center justify-center shrink-0">
-                        <Building2 className="w-5 h-5 text-gray-500" />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{item.name}</p>
-                        <p className="text-[9px] text-gray-500 dark:text-[#a3a3a3] font-bold tracking-widest uppercase mt-0.5">{item.ticker_symbol}</p>
-                      </div>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">{qty.toFixed(4)}</p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-bold text-gray-500 dark:text-[#a3a3a3]">₹{avgPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹{curPrice.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className="text-sm font-bold text-[#0A3D8B] dark:text-blue-400">₹{value.toLocaleString('en-IN', {minimumFractionDigits: 2})}</p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <p className={`text-sm font-bold ${isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {isPositive ? '+' : ''}₹{pl.toLocaleString('en-IN', {minimumFractionDigits: 2})}
-                      </p>
-                      <p className={`text-[9px] font-bold uppercase tracking-widest mt-0.5 ${isPositive ? 'text-emerald-600/70 dark:text-emerald-500/70' : 'text-red-600/70 dark:text-red-500/70'}`}>
-                        {plPct.toFixed(2)}%
-                      </p>
-                    </td>
-                    <td className="px-6 py-5 text-right">
-                      <button onClick={() => setAssetToDelete(item.id)} className="text-gray-400 hover:text-red-500 transition-colors p-1">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-              {safeAssets.length === 0 && (
-                <tr><td colSpan="7" className="text-center py-8 text-sm text-gray-500">No assets tracked. Add your first investment.</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {isAddOpen && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-auto">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddOpen(false)}></div>
-          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-md rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up">
-            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a]">
-              <div>
-                <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Track New Asset</h2>
-                <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Add to portfolio</p>
-              </div>
-              <button onClick={() => setIsAddOpen(false)} className="text-gray-400 hover:text-[#0F172A] dark:hover:text-gray-300 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
-            </div>
+      {/* --- TAB CONTENT: MARKETS --- */}
+      {activeTab === 'market' && (
+        <div className="flex flex-col xl:flex-row gap-6">
+          <div className="flex-1 bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden">
             
-            <form onSubmit={handleAddAsset} className="p-6 space-y-5">
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Name</label>
-                <input required type="text" value={newAsset.name} onChange={e => setNewAsset({...newAsset, name: e.target.value})} placeholder="e.g. Reliance Industries" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+            <div className="p-6 border-b border-gray-200 dark:border-[#262626] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div className="flex items-center space-x-2">
+                <PieChart className="w-5 h-5 text-gray-400" />
+                <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Active Holdings</h3>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Ticker / MF Code</label>
-                  <input required type="text" value={newAsset.ticker_symbol} onChange={e => setNewAsset({...newAsset, ticker_symbol: e.target.value})} placeholder="RELIANCE.NS or 119062" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+              
+              <div className="flex w-full sm:w-auto items-center space-x-3">
+                <div className="relative flex-1 sm:w-48">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <input 
+                    type="text" placeholder="Search asset..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm text-[#0F172A] dark:text-gray-200 rounded-lg focus:outline-none focus:border-[#0A3D8B] dark:focus:border-blue-500"
+                  />
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Type</label>
-                  <select value={newAsset.asset_type} onChange={e => setNewAsset({...newAsset, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]">
-                    <option value="stock">Stock / ETF</option>
-                    <option value="mf">Mutual Fund</option>
-                    <option value="crypto">Crypto / Other</option>
+                <div className="relative">
+                  <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <select 
+                    value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
+                    className="pl-9 pr-8 py-2 bg-gray-50 dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-bold text-[#0F172A] dark:text-gray-200 rounded-lg focus:outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Stock">Stock</option>
+                    <option value="ETF">ETF</option>
+                    <option value="Crypto">Crypto</option>
+                    <option value="Mutual Fund">Mutual Fund</option>
                   </select>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Quantity Owned</label>
-                  <input required type="number" step="0.0001" value={newAsset.quantity} onChange={e => setNewAsset({...newAsset, quantity: e.target.value})} placeholder="10.5" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-[#0a0a0a] text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold border-b border-gray-200 dark:border-[#262626]">
+                    <th className="p-4">Asset</th>
+                    <th className="p-4">Type</th>
+                    <th className="p-4 text-right">Avg Price</th>
+                    <th className="p-4 text-right">LTP</th>
+                    <th className="p-4 text-right">Unrealized P&L</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {filteredMarketAssets.length > 0 ? (
+                    filteredMarketAssets.map(asset => (
+                      <tr 
+                        key={asset.id} onClick={() => setSelectedAssetHistory(asset)}
+                        className="border-b border-gray-100 dark:border-[#262626] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors group cursor-pointer"
+                      >
+                        <td className="p-4">
+                          <p className="font-bold text-[#0F172A] dark:text-gray-200 group-hover:text-[#0A3D8B] dark:group-hover:text-blue-400 transition-colors">{asset.symbol || asset.name}</p>
+                          <p className="text-xs text-gray-500">{asset.name} ({asset.quantity} shares)</p>
+                        </td>
+                        <td className="p-4"><span className="px-2 py-1 bg-gray-100 dark:bg-[#262626] text-gray-600 dark:text-gray-300 rounded text-xs font-bold">{asset.type}</span></td>
+                        <td className="p-4 text-right font-semibold">₹{asset.avgPrice.toLocaleString('en-IN')}</td>
+                        <td className="p-4 text-right font-bold text-[#0F172A] dark:text-gray-200">₹{asset.currentPrice.toLocaleString('en-IN')}</td>
+                        <td className="p-4 text-right">
+                          <p className={`font-bold ${asset.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+                            {asset.pnl >= 0 ? '+' : ''}₹{asset.pnl.toLocaleString('en-IN')}
+                          </p>
+                          <p className={`text-xs font-bold flex items-center justify-end mt-0.5 ${asset.pnl >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+                            {asset.pnl >= 0 ? <ArrowUpRight className="w-3 h-3 mr-0.5" /> : <ArrowDownRight className="w-3 h-3 mr-0.5" />}
+                            {asset.pnlPct}%
+                          </p>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="5" className="p-8 text-center text-gray-500 font-medium">No assets found matching parameters.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* SIDEBAR INTEL GRID */}
+          <div className="w-full xl:w-96 flex flex-col gap-6">
+            <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+              <div className="flex items-center space-x-2 mb-3">
+                <CircleDollarSign className="w-4 h-4 text-emerald-500" />
+                <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400">Realized P&L (12 Months)</p>
+              </div>
+              <h3 className={`text-2xl font-bold ${realizedPnL12Months >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+                {realizedPnL12Months >= 0 ? '+' : ''}₹{realizedPnL12Months.toLocaleString('en-IN')}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">Booked cash returns locked from asset sales.</p>
+            </div>
+
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-[#1a1a2e] dark:to-[#16213e] p-6 rounded-2xl border border-indigo-100 dark:border-indigo-900/30">
+              <div className="flex items-center space-x-2 mb-6">
+                <Bell className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-900 dark:text-indigo-300">Market Intelligence</h3>
+              </div>
+              <div className="space-y-4">
+                 <p className="text-xs text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed text-center py-4">Live updates will stream dynamically.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: COMMODITIES --- */}
+      {activeTab === 'commodities' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {commodities.map(item => {
+             const totalVal = item.currentPrice * item.quantity;
+             const pnl = (item.currentPrice - item.avgPrice) * item.quantity;
+             const pnlPct = item.avgPrice > 0 ? ((item.currentPrice - item.avgPrice) / item.avgPrice) * 100 : 0;
+
+             return (
+              <div 
+                key={item.id} onClick={() => setSelectedAssetHistory(item)}
+                className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] group hover:-translate-y-1 hover:border-[#0A3D8B] dark:hover:border-blue-500 transition-all duration-300 cursor-pointer"
+              >
+                <div className="flex justify-between items-start mb-6">
+                  <div className="flex items-center space-x-3">
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${item.type === 'Gold' ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-200 text-gray-600'}`}>
+                      <Coins className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200 group-hover:text-[#0A3D8B] dark:group-hover:text-blue-400 transition-colors">{item.type}</h3>
+                      <p className="text-xs text-gray-500 font-bold">{item.quantity} Units • {item.name}</p>
+                    </div>
+                  </div>
                 </div>
-                <div className="col-span-2 md:col-span-1">
-                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Avg Buy Price (₹)</label>
-                  <input required type="number" step="0.01" value={newAsset.average_buy_price} onChange={e => setNewAsset({...newAsset, average_buy_price: e.target.value})} placeholder="2500.00" className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center border-b border-gray-100 dark:border-[#262626] pb-3"><span className="text-xs text-gray-500">Avg Buy Price</span><span className="text-sm font-bold text-[#0F172A] dark:text-gray-300">₹{item.avgPrice.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between items-center border-b border-gray-100 dark:border-[#262626] pb-3"><span className="text-xs text-gray-500">Current Market</span><span className="text-sm font-bold text-[#0F172A] dark:text-gray-300">₹{item.currentPrice.toLocaleString('en-IN')}</span></div>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-xs font-bold uppercase tracking-widest text-gray-500">Total Value</span>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-[#0A3D8B] dark:text-blue-400">₹{totalVal.toLocaleString('en-IN')}</p>
+                      <p className={`text-xs font-bold flex items-center justify-end ${pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>{pnl >= 0 ? '+' : ''}₹{pnl.toLocaleString('en-IN')} ({pnlPct.toFixed(2)}%)</p>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <button type="submit" className="w-full py-3.5 bg-[#0A3D8B] dark:bg-gray-800 text-white rounded-xl text-sm font-bold shadow-lg mt-4">Add Asset</button>
+          )})}
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: REAL ESTATE --- */}
+      {activeTab === 'real_estate' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {realEstate.map(property => (
+            <div key={property.id} className="bg-white dark:bg-[#121212] rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] overflow-hidden">
+              <div className="h-24 bg-gradient-to-r from-gray-200 to-gray-300 dark:from-[#1a1a1a] dark:to-[#262626] relative">
+                <div className="absolute -bottom-6 left-6 w-12 h-12 bg-white dark:bg-[#0a0a0a] border-4 border-white dark:border-[#121212] rounded-xl flex items-center justify-center"><Landmark className="w-5 h-5 text-[#0A3D8B] dark:text-blue-400" /></div>
+                <div className="absolute top-4 right-4 px-2 py-1 bg-black/50 backdrop-blur-md rounded text-[10px] font-bold text-white uppercase tracking-widest">{property.type || 'Property'}</div>
+              </div>
+              <div className="p-6 pt-10">
+                <div className="flex justify-between items-start mb-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">{property.name}</h3>
+                    <p className="text-xs text-gray-500">{property.metadata?.location || 'Properties Portfolio'}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4 bg-gray-50 dark:bg-[#0a0a0a] p-4 rounded-xl">
+                  <div><p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1">Purchase Cost</p><p className="text-sm font-semibold text-[#0F172A] dark:text-gray-300">₹{property.avgPrice.toLocaleString('en-IN')}</p></div>
+                  <div><p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold mb-1">Estimated Value</p><p className="text-sm font-bold text-[#0F172A] dark:text-gray-200">₹{property.currentPrice.toLocaleString('en-IN')}</p></div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* --- TAB CONTENT: FIXED INCOME --- */}
+      {activeTab === 'fixed_income' && (
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+             <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-[#262626] pb-4">
+              <div className="flex items-center space-x-2"><Landmark className="w-5 h-5 text-indigo-600" /><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Fixed Income Ledger</h3></div>
+            </div>
+            <div className="space-y-6">
+              {fixedIncome.map(fd => (
+                <div key={fd.id} className="relative flex justify-between items-center">
+                  <div><h4 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">{fd.name}</h4></div>
+                  <div className="text-right"><p className="text-sm font-bold text-[#0A3D8B] dark:text-blue-400">₹{fd.quantity.toLocaleString('en-IN')}</p></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+            <div className="flex items-center justify-between mb-6 border-b border-gray-100 dark:border-[#262626] pb-4">
+              <div className="flex items-center space-x-2"><Shield className="w-5 h-5 text-emerald-600" /><h3 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Policies Assured</h3></div>
+            </div>
+            <div className="space-y-4">{insurance.map(ins => (<div key={ins.id} className="text-sm text-gray-400">{ins.name}</div>))}</div>
+          </div>
+        </div>
+      )}
+
+
+      {/* --- MODAL: ADD / SELL ASSET --- */}
+      {isAddModalOpen && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#262626] flex flex-col max-h-[90vh]">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a] rounded-t-2xl">
+              <div>
+                <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Record Asset Transaction</h2>
+                <p className="text-[10px] text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mt-0.5">Live Database Entry</p>
+              </div>
+              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+            </div>
+            
+            <form id="asset-form" onSubmit={handleAddAsset} className="p-6 overflow-y-auto space-y-5">
+              
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Transaction Type</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {['Buy', 'Sell'].map(act => (
+                    <div 
+                      key={act} onClick={() => setFormData({...formData, action: act})}
+                      className={`cursor-pointer py-3 rounded-xl text-xs font-bold text-center border transition-all ${formData.action === act ? 'bg-[#0A3D8B] text-white border-transparent' : 'bg-gray-50 dark:bg-[#0a0a0a] border-gray-200 dark:border-[#262626] text-gray-600 dark:text-gray-400'}`}
+                    >
+                      {act === 'Buy' ? '🟢 Buy / Add Asset' : '🔴 Sell / Reduce Asset'}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Class</label>
+                <select 
+                  required value={formData.asset_class} onChange={(e) => setFormData({...formData, asset_class: e.target.value})}
+                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] transition-colors cursor-pointer"
+                >
+                  <option value="market">Stock / ETF / Mutual Fund / Crypto</option>
+                  <option value="commodity">Physical Gold / Silver</option>
+                  <option value="real_estate">Real Estate (Land/Property)</option>
+                  <option value="fixed_income">Fixed Deposit / Bond</option>
+                  <option value="insurance">Insurance Policy</option>
+                </select>
+              </div>
+              
+              <div>
+                <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Specific Asset Identifier Class</label>
+                <input required type="text" placeholder="Stock, Crypto, FD, Gold, etc." value={formData.asset_type} onChange={(e) => setFormData({...formData, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Asset Name</label>
+                  <input required type="text" placeholder="e.g. Delhivery" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+                <div className="col-span-2 md:col-span-1">
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Symbol / Ticker</label>
+                  <input type="text" placeholder="e.g. DELHIVERY" value={formData.symbol} onChange={(e) => setFormData({...formData, symbol: e.target.value.toUpperCase()})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Quantity / Units</label>
+                  <input required type="number" step="0.00001" placeholder="shares volume" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">{formData.action === 'Buy' ? 'Execution Buy Price' : 'Execution Sell Price'} (₹)</label>
+                  <input required type="number" step="0.01" placeholder="Price value" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                </div>
+              </div>
             </form>
+
+            <div className="p-6 border-t border-gray-200 dark:border-[#262626] bg-gray-50 dark:bg-[#0a0a0a] rounded-b-2xl">
+              <button 
+                type="submit" form="asset-form" disabled={isSubmitting}
+                className="w-full py-3.5 bg-[#0A3D8B] dark:bg-blue-600 hover:bg-[#082f6b] text-white rounded-xl text-sm font-bold shadow-lg disabled:opacity-50"
+              >
+                {isSubmitting ? 'Syncing Execution Ledger...' : 'Commit Transaction to Database'}
+              </button>
+            </div>
           </div>
         </div>,
         document.body
       )}
 
-      {/* CUSTOM DELETE MODAL */}
-      {assetToDelete && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 pointer-events-auto">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setAssetToDelete(null)}></div>
-          <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-sm rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up p-6 text-center">
-            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <AlertTriangle className="w-8 h-8 text-red-500" />
+      {/* --- MODAL: DETAILED ASSET OVERVIEW & HISTORICAL TRANSACTION LEDGER --- */}
+      {selectedAssetHistory && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSelectedAssetHistory(null)}></div>
+          <div className="relative w-full max-w-xl bg-white dark:bg-[#121212] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#262626] flex flex-col max-h-[90vh]">
+            <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-start bg-white dark:bg-[#0a0a0a] rounded-t-2xl">
+              <div>
+                <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">{selectedAssetHistory.symbol || selectedAssetHistory.name}</h2>
+                <div className="flex space-x-3 text-xs font-bold text-gray-500">
+                  <span>{selectedAssetHistory.type}</span>
+                  <span>•</span>
+                  <span>Open Returns: <span className={selectedAssetHistory.pnl >= 0 ? 'text-emerald-500' : 'text-red-500'}>₹{(selectedAssetHistory.pnl || 0).toLocaleString('en-IN')}</span></span>
+                </div>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <button 
+                  onClick={() => triggerDeleteAsset(selectedAssetHistory.id, selectedAssetHistory.name)}
+                  className="flex items-center text-xs font-bold px-3 py-1.5 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/40 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5 mr-1" /> Wipe Position
+                </button>
+                <button onClick={() => setSelectedAssetHistory(null)} className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-[#0F172A] dark:text-gray-200 mb-2">Untrack Asset?</h2>
-            <p className="text-sm text-gray-500 dark:text-[#a3a3a3] mb-6">Are you sure you want to remove this asset? This does not sell the asset.</p>
-            <div className="flex space-x-3">
-              <button onClick={() => setAssetToDelete(null)} className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-[#333] text-[#0F172A] dark:text-gray-200 rounded-xl text-sm font-bold transition-colors border border-gray-200 dark:border-transparent">Cancel</button>
-              <button onClick={confirmDelete} className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg">Untrack</button>
+            
+            <div className="p-0 overflow-y-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-[#1a1a1a] text-[10px] uppercase tracking-widest text-gray-500 dark:text-gray-400 font-bold border-b border-gray-200 dark:border-[#262626]">
+                    <th className="p-4 pl-6">Date</th>
+                    <th className="p-4">Action</th>
+                    <th className="p-4 text-right">Qty</th>
+                    <th className="p-4 text-right">Price</th>
+                    <th className="p-4 pr-6 text-center">Delete</th>
+                  </tr>
+                </thead>
+                <tbody className="text-sm">
+                  {selectedAssetHistory.history && selectedAssetHistory.history.length > 0 ? (
+                    selectedAssetHistory.history.map((tx, idx) => (
+                      <tr key={idx} className="border-b border-gray-100 dark:border-[#262626] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors">
+                        <td className="p-4 pl-6 font-semibold text-[#0F172A] dark:text-gray-300">{new Date(tx.date).toLocaleDateString()}</td>
+                        <td className="p-4">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${tx.action === 'Buy' ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30' : 'bg-red-50 text-red-700 dark:bg-red-900/30'}`}>
+                            {tx.action}
+                          </span>
+                        </td>
+                        <td className="p-4 text-right text-gray-600 dark:text-gray-400 font-semibold">{tx.quantity}</td>
+                        <td className="p-4 text-right text-[#0F172A] dark:text-gray-300 font-bold">₹{tx.price.toLocaleString('en-IN')}</td>
+                        <td className="p-4 pr-6 text-center">
+                          <button 
+                            onClick={() => triggerDeleteTransaction(tx.id)}
+                            className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-1.5 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors mx-auto block"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr><td colSpan="5" className="p-8 text-center text-gray-500 font-medium">No records logged.</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>,
         document.body
       )}
+
+      {/* --- CUSTOM DELETION CONFIRMATION MODAL --- */}
+      {confirmDelete.isOpen && createPortal(
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 overflow-hidden">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={() => setConfirmDelete({ ...confirmDelete, isOpen: false })}></div>
+          
+          <div className="relative w-full max-w-sm bg-white dark:bg-[#121212] rounded-2xl border border-gray-200 dark:border-[#262626] shadow-2xl p-6 transform transition-all">
+            <div className="flex items-center justify-center w-14 h-14 mx-auto bg-red-100 dark:bg-red-900/30 rounded-full mb-5">
+              <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-500" />
+            </div>
+            
+            <h3 className="text-xl font-bold text-center text-[#0F172A] dark:text-gray-200 mb-2">{confirmDelete.title}</h3>
+            <p className="text-sm text-center text-gray-600 dark:text-[#a3a3a3] mb-6 leading-relaxed">
+              {confirmDelete.message}
+            </p>
+            
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmDelete({ ...confirmDelete, isOpen: false })}
+                className="flex-1 py-3 bg-gray-100 dark:bg-[#262626] hover:bg-gray-200 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-xl text-sm font-bold transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={executeDelete}
+                className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-colors shadow-lg"
+              >
+                Yes, Delete
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
     </div>
   );
 };

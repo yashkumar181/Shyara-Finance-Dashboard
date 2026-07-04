@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  Flame, PlaneTakeoff, Ghost, TrendingDown, AlertTriangle, 
-  Download, Activity, Target, RefreshCw, Clock, CheckCircle2, TrendingUp, BarChart3, ShieldCheck, Network
+  PlaneTakeoff, Ghost, TrendingDown, AlertTriangle, 
+  Download, Target, RefreshCw, Clock, CheckCircle2, TrendingUp, BarChart3, ShieldCheck, Network
 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { useApi } from '../lib/api';
@@ -14,56 +14,50 @@ const Insights = () => {
   const { 
     dashboard, setDashboard, accounts, setAccounts, 
     subscriptions, setSubscriptions, goals, setGoals,
-    preferences, updatePreference, insights 
+    insights 
   } = useAppStore();
 
-  // Optimistic Cache Loading State
   const [isInitializing, setIsInitializing] = useState(() => !localStorage.getItem('shyara_insights_cache'));
   const [isSilentlyRefreshing, setIsSilentlyRefreshing] = useState(false);
   const [burnRateView, setBurnRateView] = useState('monthly');
 
-  const [extraSavings, setExtraSavings] = useState(preferences?.fireExtraSavings || 0);
-  const [targetAge, setTargetAge] = useState(preferences?.fireTargetAge || 50);
-  const currentAge = 28; 
-
-  useEffect(() => {
-    updatePreference('fireExtraSavings', extraSavings);
-    updatePreference('fireTargetAge', targetAge);
-  }, [extraSavings, targetAge, updatePreference]);
-
   useEffect(() => {
     const fetchInsightsData = async () => {
-      // 1. Instantly pull the cached Insights from the browser
       const cachedInsights = localStorage.getItem('shyara_insights_cache');
       if (cachedInsights) {
         useAppStore.getState().setInsights(JSON.parse(cachedInsights));
-        setIsInitializing(false); // Turn off full screen loader instantly
+        setIsInitializing(false);
       }
 
-      // 2. Start the silent background sync
       setIsSilentlyRefreshing(true);
 
       try {
-        const dashData = await api.getDashboard().catch(() => null);
-        const accData = await api.getAccounts().catch(() => null);
-        const subData = await api.getSubscriptions().catch(() => null);
-        const goalData = await api.getGoals().catch(() => null);
-        const insightsData = await api.getInsights().catch(() => null);
+        const [dashData, accData, subData, goalData, insightsData] = await Promise.all([
+          api.getDashboard().catch(() => null),
+          api.getAccounts().catch(() => null),
+          api.getSubscriptions().catch(() => null),
+          api.getGoals().catch(() => null),
+          api.getInsights().catch(() => null)
+        ]);
         
         if (dashData) setDashboard(dashData);
         if (accData) setAccounts(accData);
         if (subData) setSubscriptions(subData?.saved || []);
         if (goalData) setGoals(goalData);
         
-        // 3. Save new AI data to cache for the next time the user visits
         if (insightsData) {
             useAppStore.getState().setInsights(insightsData);
             localStorage.setItem('shyara_insights_cache', JSON.stringify(insightsData));
         }
         
-      } catch (error) { console.error("Silent sync failed:", error); } 
-      finally { setIsInitializing(false); setIsSilentlyRefreshing(false); }
+      } catch (error) { 
+        console.error("Silent sync failed:", error); 
+      } finally { 
+        setIsInitializing(false); 
+        setIsSilentlyRefreshing(false); 
+      }
     };
+    
     fetchInsightsData();
   }, [api, setDashboard, setAccounts, setSubscriptions, setGoals]);
 
@@ -78,28 +72,12 @@ const Insights = () => {
     );
   }
 
-  const safeDashboard = dashboard || {};
-  const currentNetWorth = safeDashboard.netWorth || 0;
-  const monthlySpend = safeDashboard.monthlySpent || 1; 
-  const monthlyBudget = safeDashboard.monthlyBudget || 0;
-
-  const annualSpend = monthlySpend * 12;
-  const fireCorpusTarget = annualSpend * 25;
-  const baseMonthlySavings = Math.max((monthlyBudget - monthlySpend), 0);
-  const totalMonthlySavings = baseMonthlySavings + Number(extraSavings);
-  let yearsToFire = 99; 
-  if (totalMonthlySavings > 0) yearsToFire = Math.max(0, Math.log((fireCorpusTarget * 0.00833) / totalMonthlySavings + 1) / Math.log(1.00833) / 12);
-  const projectedAge = Math.round(currentAge + yearsToFire);
-  const isPacingWell = projectedAge <= targetAge;
-
   const safeAccounts = Array.isArray(accounts) ? accounts : [];
+  const safeDashboard = dashboard || {};
+  const monthlySpend = safeDashboard.monthlySpent || 1; 
+
   const liquidCash = safeAccounts.filter(a => a.account_type !== 'credit_card').reduce((sum, a) => sum + parseFloat(a.balance || 0), 0);
   const runwayMonths = monthlySpend > 0 ? (liquidCash / monthlySpend).toFixed(1) : "99.9";
-
-  const totalCCDebt = insights?.totalCCDebt || 0;
-  const debtMonths = insights?.debtPayoffMonths || 0;
-  const payoffDate = new Date();
-  if (debtMonths > 0) payoffDate.setMonth(payoffDate.getMonth() + debtMonths);
   const burnRateData = insights?.burnRateHistory?.[burnRateView] || [];
 
   return (
@@ -115,26 +93,6 @@ const Insights = () => {
         <button onClick={() => window.print()} className="flex items-center px-4 py-2 bg-white dark:bg-[#121212] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 rounded-lg text-xs font-semibold hover:bg-gray-50 dark:hover:bg-[#1a1a1a] shadow-sm">
           <Download className="w-4 h-4 mr-2" /> Export Insights
         </button>
-      </div>
-
-      <div className="bg-[#0A3D8B] dark:bg-[#1A2235] p-6 md:p-10 rounded-2xl shadow-xl text-white mb-8 relative overflow-hidden border border-transparent dark:border-[#262626]">
-        <div className="absolute right-0 bottom-0 opacity-10 transform translate-x-1/4 translate-y-1/4 pointer-events-none"><Flame className="w-64 h-64" /></div>
-        <div className="relative z-10 flex flex-col xl:flex-row justify-between gap-10">
-          <div className="w-full xl:w-1/2">
-            <div className="flex justify-between items-center mb-4">
-              <div className="flex items-center space-x-2"><Flame className="w-5 h-5 text-orange-400" /><h2 className="text-sm font-bold tracking-widest uppercase text-blue-200">F.I.R.E. Projection</h2></div>
-              <div className="text-right"><p className="text-[10px] text-blue-200 uppercase tracking-widest font-bold">Current Net Worth</p><p className="text-sm font-bold">₹{currentNetWorth.toLocaleString('en-IN')}</p></div>
-            </div>
-            <h3 className="text-4xl md:text-5xl font-bold mb-4">Age {yearsToFire === 99 ? '?' : projectedAge}</h3>
-            <p className="text-sm text-blue-100 max-w-md leading-relaxed mb-6">Based on your target corpus of <span className="font-bold text-white">₹{fireCorpusTarget.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span> and a monthly savings rate of ₹{totalMonthlySavings.toLocaleString('en-IN')}, you will achieve total financial independence in {yearsToFire === 99 ? 'an undetermined amount of' : yearsToFire.toFixed(1)} years.</p>
-            <div className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold ${isPacingWell ? 'bg-emerald-500/20 text-emerald-300' : 'bg-rose-500/20 text-rose-300'}`}><Activity className="w-4 h-4 mr-2" /> {totalMonthlySavings <= 0 ? 'Increase savings to generate projection.' : isPacingWell ? 'On track for target retirement.' : 'Falling behind target retirement age.'}</div>
-          </div>
-          <div className="w-full xl:w-1/2 bg-white/10 dark:bg-black/20 p-6 rounded-2xl backdrop-blur-sm shadow-inner border border-white/5">
-            <h4 className="text-sm font-bold mb-6 flex items-center"><Target className="w-4 h-4 mr-2" /> Scenario Simulator</h4>
-            <div className="mb-6"><div className="flex justify-between text-xs font-bold mb-2"><span>Extra Monthly Savings</span><span className="text-blue-200">+ ₹{Number(extraSavings).toLocaleString('en-IN')}</span></div><input type="range" min="0" max="50000" step="1000" value={extraSavings} onChange={(e) => setExtraSavings(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" /></div>
-            <div><div className="flex justify-between text-xs font-bold mb-2"><span>Target Retirement Age</span><span className="text-blue-200">Age {targetAge}</span></div><input type="range" min="35" max="65" step="1" value={targetAge} onChange={(e) => setTargetAge(e.target.value)} className="w-full h-2 bg-blue-900 rounded-lg appearance-none cursor-pointer accent-white" /></div>
-          </div>
-        </div>
       </div>
 
       <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] mb-8">
