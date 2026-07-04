@@ -12,7 +12,6 @@ export default async function handler(req, res) {
   if (req.method === "GET") {
     try {
       const limit = parseInt(req.query.limit) || 50;
-      // FIX 1: Capture the account ID if the frontend asks for a specific bank
       const accountId = req.query.account_id || req.query.accountId;
 
       let query;
@@ -46,10 +45,10 @@ export default async function handler(req, res) {
         notes: t.notes,
         date: t.transaction_date,
         accountName: t.account_name,
+        paymentMethod: t.payment_method,
         icon: t.type === "income" ? "Home" : t.category === "Food & Dining" ? "ShoppingCart" : t.category === "Entertainment" ? "Tv" : t.category === "Shopping" ? "Laptop" : "CreditCard",
       }));
 
-      // Return raw array to match your frontend expectations
       return res.status(200).json(formatted); 
     } catch (e) {
       console.error(e);
@@ -59,16 +58,11 @@ export default async function handler(req, res) {
 
   if (req.method === "POST") {
     try {
-      // FIX 2: Ensure we capture account_id reliably
       const account_id = req.body.account_id || req.body.accountId;
       const { amount, type, category, subCategory, merchant, notes, date, paymentMethod } = req.body;
       const txDate = date ? new Date(date) : new Date();
       const parsedAmount = parseFloat(amount);
 
-      // Normalize category against the user's existing budget envelopes.
-      // If the typed category matches an envelope name case/whitespace-insensitively,
-      // store the transaction under the envelope's exact canonical spelling so
-      // budget totals line up without needing fuzzy matching on every read.
       let resolvedCategory = category;
       if (category) {
         const envelopeMatch = await sql`
@@ -86,7 +80,7 @@ export default async function handler(req, res) {
       const rows = await sql`
         INSERT INTO transactions (user_id, account_id, amount, type, category, sub_category, merchant, notes, transaction_date, payment_method)
         VALUES (${uid}, ${account_id || null}, ${parsedAmount}, ${type}, ${resolvedCategory}, ${subCategory || null}, ${merchant || null}, ${notes || null}, ${txDate}, ${paymentMethod || null})
-        RETURNING id, amount, type, category, merchant, transaction_date
+        RETURNING id, amount, type, category, merchant, transaction_date, payment_method
       `;
       
       const newTx = rows[0];
@@ -117,8 +111,34 @@ export default async function handler(req, res) {
   if (req.method === "DELETE") {
     const id = req.query.id;
     if (!id) return res.status(400).json({ error: "Missing ID" });
-    await sql`DELETE FROM transactions WHERE id = ${id} AND user_id = ${uid}`;
-    return res.status(200).json({ success: true });
+    
+    try {
+      // Fetch the transaction before deleting so we can restore the balance
+      const txRows = await sql`SELECT account_id, amount, type FROM transactions WHERE id = ${id} AND user_id = ${uid}`;
+      
+      if (txRows.length > 0) {
+        const tx = txRows[0];
+        const parsedAmount = parseFloat(tx.amount);
+
+        // Reverse the balance impact on the associated account
+        if (tx.account_id) {
+          if (tx.type === 'expense') {
+            await sql`UPDATE accounts SET balance = balance + ${parsedAmount} WHERE id = ${tx.account_id} AND account_type != 'credit_card'`;
+            await sql`UPDATE accounts SET outstanding = GREATEST(0, outstanding - ${parsedAmount}) WHERE id = ${tx.account_id} AND account_type = 'credit_card'`;
+          } else if (tx.type === 'income') {
+            await sql`UPDATE accounts SET balance = balance - ${parsedAmount} WHERE id = ${tx.account_id} AND account_type != 'credit_card'`;
+            await sql`UPDATE accounts SET outstanding = outstanding + ${parsedAmount} WHERE id = ${tx.account_id} AND account_type = 'credit_card'`;
+          }
+        }
+      }
+
+      // Finally, delete the row
+      await sql`DELETE FROM transactions WHERE id = ${id} AND user_id = ${uid}`;
+      return res.status(200).json({ success: true });
+    } catch (e) {
+      console.error("Failed to delete transaction:", e);
+      return res.status(500).json({ error: "Failed to delete transaction" });
+    }
   }
 
   res.status(405).json({ error: "Method not allowed" });
