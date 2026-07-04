@@ -13,6 +13,7 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
   
   const [accounts, setAccounts] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [budgetCategories, setBudgetCategories] = useState([]); // canonical names from Budget page
 
   // Fetch real accounts when modal opens
   useEffect(() => {
@@ -28,7 +29,17 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
           console.error("Failed to fetch accounts for modal", error);
         }
       };
+      const fetchBudgetCategories = async () => {
+        try {
+          const budgetData = await api.getBudget();
+          const names = (budgetData?.categories || []).map(c => c.name).filter(Boolean);
+          setBudgetCategories(names);
+        } catch (error) {
+          console.error("Failed to fetch budget categories for suggestions", error);
+        }
+      };
       fetchAccounts();
+      fetchBudgetCategories();
     }
   }, [isOpen, api]);
 
@@ -40,11 +51,19 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
 
     setIsLoading(true);
     try {
+      // If the typed merchant matches an existing Budget category name,
+      // tag the transaction with that category so it shows up in the
+      // corresponding Budget card. Otherwise keep the manually selected category.
+      const merchantMatch = budgetCategories.find(
+        name => name.trim().toLowerCase() === merchant.trim().toLowerCase()
+      );
+      const resolvedCategory = merchantMatch || category;
+
       await api.createTransaction({
         type,
         amount: parseFloat(amount),
         merchant,
-        category,
+        category: resolvedCategory,
         account_id: parseInt(accountId),
         date
       });
@@ -66,7 +85,7 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity" onClick={onClose}></div>
+      <div className="absolute inset-0 transition-opacity bg-black/60 backdrop-blur-sm" onClick={onClose}></div>
       
       <div className="bg-[#F8F9FA] dark:bg-[#121212] w-full max-w-md rounded-2xl shadow-2xl relative z-10 border border-gray-200 dark:border-[#262626] overflow-hidden animate-fade-slide-up">
         
@@ -105,14 +124,19 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Merchant/Entity</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><FileText className="w-4 h-4 text-gray-400" /></div>
-                  <input required type="text" value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="e.g. Amazon" className="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:text-white" />
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><FileText className="w-4 h-4 text-gray-400" /></div>
+                  <input required type="text" list="merchant-budget-suggestions" value={merchant} onChange={e => setMerchant(e.target.value)} placeholder="e.g. Amazon" className="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:text-white" />
+                  <datalist id="merchant-budget-suggestions">
+                    {budgetCategories.map(name => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                 </div>
               </div>
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Category</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Tag className="w-4 h-4 text-gray-400" /></div>
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><Tag className="w-4 h-4 text-gray-400" /></div>
                   <select required value={category} onChange={e => setCategory(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:text-white appearance-none cursor-pointer">
                     <option value="" disabled>Select...</option>
                     {type === 'expense' ? (
@@ -142,7 +166,7 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Funding Source</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Wallet className="w-4 h-4 text-gray-400" /></div>
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><Wallet className="w-4 h-4 text-gray-400" /></div>
                   <select required value={accountId} onChange={e => setAccountId(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:text-white appearance-none cursor-pointer">
                     {accounts.map(acc => (
                       <option key={acc.id} value={acc.id}>{acc.nickname}</option>
@@ -154,7 +178,7 @@ const AddTransactionModal = ({ isOpen, onClose, onTransactionAdded }) => {
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Date</label>
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Calendar className="w-4 h-4 text-gray-400" /></div>
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none"><Calendar className="w-4 h-4 text-gray-400" /></div>
                   <input required type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full pl-10 pr-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:text-white" />
                 </div>
               </div>

@@ -88,7 +88,7 @@ const Budget = () => {
 
   // Block the UI only if loading AND data is null
   if (budgetLoading && !budget) {
-    return <div className="flex-1 p-10 flex items-center justify-center animate-pulse text-gray-500 uppercase tracking-widest text-sm font-bold">Initializing Fiscal Engine...</div>;
+    return <div className="flex items-center justify-center flex-1 p-10 text-sm font-bold tracking-widest text-gray-500 uppercase animate-pulse">Initializing Fiscal Engine...</div>;
   }
 
   // Ensure budget exists before accessing
@@ -99,7 +99,7 @@ const Budget = () => {
   const isSurplus = summary.projectedSurplus >= 0;
 
   return (
-<div className="flex-1 overflow-auto p-4 pb-28 md:p-10 md:pb-10 relative">      <div className="flex flex-col md:flex-row justify-between md:items-end mb-8 gap-4">
+<div className="relative flex-1 p-4 overflow-auto pb-28 md:p-10 md:pb-10">      <div className="flex flex-col justify-between gap-4 mb-8 md:flex-row md:items-end">
         <div>
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Fiscal Pacing</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Monitor category thresholds and predictive burn rates.</p>
@@ -109,15 +109,15 @@ const Budget = () => {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-3">
         
         <div className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
-          <div className="flex justify-between items-start mb-4">
+          <div className="flex items-start justify-between mb-4">
             <div>
               <p className="text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-1">Total Allocated Limit</p>
               <div className="flex items-end gap-2">
                 <h2 className="text-3xl font-bold text-[#0F172A] dark:text-gray-200">₹{summary.totalSpent.toLocaleString('en-IN', {maximumFractionDigits: 0})}</h2>
-                <span className="text-sm font-bold text-gray-400 mb-1">/ ₹{summary.totalLimit.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>
+                <span className="mb-1 text-sm font-bold text-gray-400">/ ₹{summary.totalLimit.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>
               </div>
             </div>
             <div className="w-12 h-12 rounded-full border-4 border-gray-200 dark:border-[#262626] flex items-center justify-center relative shrink-0">
@@ -131,7 +131,7 @@ const Budget = () => {
         </div>
 
         <div className="bg-[#F0F5FF] dark:bg-[#1A2235] p-6 rounded-2xl shadow-sm border border-blue-50 dark:border-blue-900/30 flex flex-col justify-between">
-          <div className="flex justify-between items-start">
+          <div className="flex items-start justify-between">
             <p className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-300 uppercase tracking-widest">Daily Safe-to-Spend</p>
             {summary.totalRemaining > 0 && daysLeft <= 5 && (
               <button onClick={handleSweep} className="text-[9px] font-bold bg-[#0A3D8B] text-white px-2 py-1 rounded uppercase tracking-wider">SWEEP</button>
@@ -144,7 +144,7 @@ const Budget = () => {
         </div>
 
         <div className={`p-6 rounded-2xl shadow-sm border flex flex-col justify-between ${isSurplus ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-900/30' : 'bg-red-50 dark:bg-red-900/10 border-red-100 dark:border-red-900/30'}`}>
-          <div className="flex justify-between items-start mb-2">
+          <div className="flex items-start justify-between mb-2">
             <p className={`text-[10px] font-bold uppercase tracking-widest ${isSurplus ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>End-of-Month Projection</p>
             <Compass className={`w-4 h-4 ${isSurplus ? 'text-emerald-500' : 'text-red-500'}`} />
           </div>
@@ -164,7 +164,7 @@ const Budget = () => {
          <h2 className="text-sm font-bold text-[#0F172A] dark:text-gray-200">Category Envelopes & Specific Pacing</h2>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 md:grid-cols-2 xl:grid-cols-3">
         {categories.map((cat) => {
           const Icon = iconMap[cat.icon] || PieChart;
           const isOver = cat.spent > cat.limit;
@@ -172,7 +172,7 @@ const Budget = () => {
 
           return (
             <div key={cat.id} className="bg-[#F8F9FA] dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] group">
-              <div className="flex justify-between items-start mb-6">
+              <div className="flex items-start justify-between mb-6">
                 <div className="flex items-center space-x-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isOver ? 'bg-red-50 text-red-600 dark:bg-red-900/20' : 'bg-gray-100 dark:bg-[#262626] text-[#0A3D8B] dark:text-gray-300'}`}>
                     <Icon className="w-5 h-5" />
@@ -184,10 +184,10 @@ const Budget = () => {
                     </span>
                   </div>
                 </div>
-                <button onClick={() => handleDelete(cat.id)} className="text-gray-300 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100 p-1"><Trash2 className="w-4 h-4" /></button>
+                <button onClick={() => handleDelete(cat.id)} className="p-1 text-gray-300 transition-colors opacity-0 hover:text-red-500 group-hover:opacity-100"><Trash2 className="w-4 h-4" /></button>
               </div>
               
-              <div className="flex justify-between items-end mb-3">
+              <div className="flex items-end justify-between mb-3">
                 <p className="text-2xl font-bold text-[#0F172A] dark:text-gray-200">₹{cat.spent.toLocaleString('en-IN')}</p>
                 <p className="text-[10px] font-bold text-gray-400 dark:text-[#a3a3a3]">/ ₹{cat.limit.toLocaleString('en-IN')}</p>
               </div>
@@ -234,11 +234,11 @@ const Budget = () => {
               </div>
 
               {insightAvg !== null && insightAvg > 0 && (
-                <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-xl border border-blue-100 dark:border-transparent flex items-start gap-3">
+                <div className="flex items-start gap-3 p-3 border border-blue-100 bg-blue-50 dark:bg-blue-900/20 rounded-xl dark:border-transparent">
                   <Zap className="w-4 h-4 text-[#0A3D8B] dark:text-blue-400 shrink-0 mt-0.5" />
                   <div>
                     <p className="text-[10px] font-bold text-[#0A3D8B] dark:text-blue-400 uppercase tracking-widest mb-0.5">Smart Insight</p>
-                    <p className="text-xs text-blue-800 dark:text-blue-300 font-medium">Your 90-day average for this category is <span className="font-bold">₹{insightAvg.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>. Consider this when setting limits.</p>
+                    <p className="text-xs font-medium text-blue-800 dark:text-blue-300">Your 90-day average for this category is <span className="font-bold">₹{insightAvg.toLocaleString('en-IN', {maximumFractionDigits: 0})}</span>. Consider this when setting limits.</p>
                   </div>
                 </div>
               )}

@@ -10,6 +10,8 @@ const TransactionSheet = ({ isOpen, onClose }) => {
 
   const [accountsList, setAccountsList] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [budgetCategoryNames, setBudgetCategoryNames] = useState([]);
+  const [showMerchantSuggestions, setShowMerchantSuggestions] = useState(false);
   const [formData, setFormData] = useState({
     merchant: '',
     notes: '', // <-- NEW: Added notes field
@@ -33,7 +35,17 @@ const TransactionSheet = ({ isOpen, onClose }) => {
           console.error(error);
         }
       };
+      const fetchBudgetCategoryNames = async () => {
+        try {
+          const budgetData = await api.getBudget();
+          const names = (budgetData?.categories || []).map(c => c.name).filter(Boolean);
+          setBudgetCategoryNames(names);
+        } catch (error) {
+          console.error("Failed to fetch budget categories for merchant suggestions", error);
+        }
+      };
       fetchAccounts();
+      fetchBudgetCategoryNames();
     }
   }, [isOpen, api]);
 
@@ -104,10 +116,31 @@ const TransactionSheet = ({ isOpen, onClose }) => {
             <div className="grid grid-cols-2 gap-4">
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Merchant / Entity</label>
-                <input 
-                  required type="text" value={formData.merchant} onChange={(e) => setFormData({...formData, merchant: e.target.value})} placeholder="e.g. Apple Store" 
-                  className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
-                />
+                <div className="relative">
+                  <input 
+                    required type="text" autoComplete="off" value={formData.merchant} 
+                    onChange={(e) => { setFormData({...formData, merchant: e.target.value}); setShowMerchantSuggestions(true); }}
+                    onFocus={() => setShowMerchantSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowMerchantSuggestions(false), 150)}
+                    placeholder="e.g. Apple Store" 
+                    className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B] dark:focus:border-gray-500 transition-colors shadow-sm"
+                  />
+                  {showMerchantSuggestions && budgetCategoryNames.filter(name => name.toLowerCase().includes(formData.merchant.toLowerCase())).length > 0 && (
+                    <div className="absolute z-20 mt-1.5 w-full bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] rounded-xl shadow-lg overflow-hidden">
+                      {budgetCategoryNames
+                        .filter(name => name.toLowerCase().includes(formData.merchant.toLowerCase()))
+                        .map(name => (
+                          <div
+                            key={name}
+                            onMouseDown={() => { setFormData({...formData, merchant: name}); setShowMerchantSuggestions(false); }}
+                            className="px-4 py-2.5 text-sm font-semibold text-[#0F172A] dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#1a1a1a] cursor-pointer transition-colors"
+                          >
+                            {name}
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="col-span-2 md:col-span-1">
                 <label className="block text-[10px] font-bold text-gray-500 dark:text-[#a3a3a3] uppercase tracking-widest mb-2">Description</label>

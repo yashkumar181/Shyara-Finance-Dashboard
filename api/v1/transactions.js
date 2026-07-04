@@ -65,10 +65,27 @@ export default async function handler(req, res) {
       const txDate = date ? new Date(date) : new Date();
       const parsedAmount = parseFloat(amount);
 
+      // Normalize category against the user's existing budget envelopes.
+      // If the typed category matches an envelope name case/whitespace-insensitively,
+      // store the transaction under the envelope's exact canonical spelling so
+      // budget totals line up without needing fuzzy matching on every read.
+      let resolvedCategory = category;
+      if (category) {
+        const envelopeMatch = await sql`
+          SELECT category_name FROM budget_configurations
+          WHERE user_id = ${uid}
+          AND LOWER(TRIM(category_name)) = LOWER(TRIM(${category}))
+          LIMIT 1
+        `;
+        if (envelopeMatch.length > 0) {
+          resolvedCategory = envelopeMatch[0].category_name;
+        }
+      }
+
       // Step A: Insert Transaction
       const rows = await sql`
         INSERT INTO transactions (user_id, account_id, amount, type, category, sub_category, merchant, notes, transaction_date, payment_method)
-        VALUES (${uid}, ${account_id || null}, ${parsedAmount}, ${type}, ${category}, ${subCategory || null}, ${merchant || null}, ${notes || null}, ${txDate}, ${paymentMethod || null})
+        VALUES (${uid}, ${account_id || null}, ${parsedAmount}, ${type}, ${resolvedCategory}, ${subCategory || null}, ${merchant || null}, ${notes || null}, ${txDate}, ${paymentMethod || null})
         RETURNING id, amount, type, category, merchant, transaction_date
       `;
       

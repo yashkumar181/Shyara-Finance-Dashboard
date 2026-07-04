@@ -25,7 +25,7 @@ export default async function handler(req, res) {
           COALESCE((
             SELECT SUM(t.amount) FROM transactions t 
             WHERE t.user_id = bc.user_id 
-            AND t.category = bc.category_name 
+            AND LOWER(TRIM(t.merchant)) = LOWER(TRIM(bc.category_name))
             AND t.type = 'expense'
             AND t.transaction_date >= ${monthStart.toISOString()}
             AND t.transaction_date < ${nextMonth.toISOString()}
