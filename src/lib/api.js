@@ -12,12 +12,10 @@ async function apiFetch(getToken, path, options = {}) {
   };
 
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
-
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new Error(body.error || `API error ${res.status}`);
   }
-
   return res.json();
 }
 
@@ -36,9 +34,7 @@ export function createApiClient(getToken) {
     updateAccount: (id, body) => put(`/api/v1/accounts?id=${id}`, body),
     deleteAccount: (id) => del(`/api/v1/accounts?id=${id}`),
     getTransactions: (params) => {
-      const qs = new URLSearchParams(
-        Object.entries(params || {}).filter(([, v]) => v !== undefined)
-      ).toString();
+      const qs = new URLSearchParams(Object.entries(params || {}).filter(([, v]) => v !== undefined)).toString();
       return get(`/api/v1/transactions${qs ? "?" + qs : ""}`);
     },
     createTransaction: (body) => post("/api/v1/transactions", body),
@@ -51,20 +47,18 @@ export function createApiClient(getToken) {
     createBudgetCategory: (body) => post("/api/v1/budget", body),
     updateBudgetCategory: (id, monthlyLimit) => put(`/api/v1/budget?id=${id}`, { monthlyLimit }),
     deleteBudgetCategory: (id) => del(`/api/v1/budget?id=${id}`),
-getInvestments: () => get("/api/v1/investments"),
-  createInvestment: (body) => post("/api/v1/investments", body),
-  deleteInvestment: (id) => del(`/api/v1/investments?id=${id}`),
-  deleteInvestmentTransaction: (txId) => del(`/api/v1/investments?transaction_id=${txId}`),
-    purgeAllData: () => del("/api/v1/user/purge"), getGoals: () => get("/api/v1/goals"),
+    getGoals: () => get("/api/v1/goals"),
     createGoal: (body) => post("/api/v1/goals", body),
     updateGoal: (body) => put("/api/v1/goals", body),
-    getInsights: () => get("/api/v1/insights"),
     deleteGoal: (id) => del(`/api/v1/goals?id=${id}`),
+    getInsights: () => get("/api/v1/insights"),
+    // Investments
     getInvestments: () => get("/api/v1/investments"),
     createInvestment: (body) => post("/api/v1/investments", body),
     deleteInvestment: (id) => del(`/api/v1/investments?id=${id}`),
-// Add this line inside your return block in src/lib/api.js, under the Investments section:
-syncInvestments: () => post("/api/v1/investments/sync", {}),
+    deleteInvestmentTransaction: (txId) => del(`/api/v1/investments?transaction_id=${txId}`),
+    syncInvestments: () => post("/api/v1/investments/sync", {}),
+    purgeAllData: () => del("/api/v1/user/purge"),
   };
 }
 

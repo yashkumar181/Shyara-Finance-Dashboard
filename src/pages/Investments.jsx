@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, TrendingDown, Plus, Wallet, PieChart, Trash2,
   Building, Landmark, Shield, Bell, Calendar, Coins, ArrowUpRight, 
-  ArrowDownRight, CircleDollarSign, Gem, Activity, Search, Filter, X, AlertTriangle
+  ArrowDownRight, CircleDollarSign, Gem, Activity, Search, Filter, X, AlertTriangle, RefreshCw
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useApi } from '../lib/api';
@@ -17,6 +17,7 @@ const Investments = () => {
   const [typeFilter, setTypeFilter] = useState('All');
   
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAssetHistory, setSelectedAssetHistory] = useState(null);
 
@@ -54,6 +55,7 @@ const Investments = () => {
     fetchInvestments();
   }, [api]);
 
+  // --- DATA PROCESSING ---
   const safeInvestments = Array.isArray(investments) ? investments : [];
 
   const rawMarketAssets = safeInvestments.filter(i => i.asset_class === 'market');
@@ -91,7 +93,65 @@ const Investments = () => {
     return totalPnL + assetRealized;
   }, 0);
 
-  // Handlers
+  // --- DYNAMIC MARKET INTELLIGENCE ALERTS ---
+  const marketAlerts = [];
+  const now = new Date();
+
+  marketAssets.forEach(asset => {
+    // metadata is already parsed into an object when it comes from the API map
+    const meta = asset.metadata || {};
+
+    if (meta.exDividendDate) {
+      const exDate = new Date(meta.exDividendDate);
+      if (exDate > now) {
+        marketAlerts.push({
+          id: `div-${asset.id}`,
+          type: 'dividend',
+          title: `${asset.symbol} Ex-Dividend`,
+          date: exDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+          value: meta.dividendRate ? `₹${meta.dividendRate} / share` : 'Upcoming',
+          timestamp: exDate.getTime()
+        });
+      }
+    }
+
+    if (meta.earningsDate) {
+      const earnDate = new Date(meta.earningsDate);
+      if (earnDate > now) {
+        marketAlerts.push({
+          id: `earn-${asset.id}`,
+          type: 'earnings',
+          title: `${asset.symbol} Earnings`,
+          date: earnDate.toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }),
+          value: 'Expected',
+          timestamp: earnDate.getTime()
+        });
+      }
+    }
+  });
+
+  // Sort alerts closest to today
+  marketAlerts.sort((a, b) => a.timestamp - b.timestamp);
+
+const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      // 1. Trigger the backend sync
+      const result = await api.syncInvestments(); 
+      console.log("Sync result:", result);
+      
+      // 2. IMPORTANT: Force a fresh fetch from the DB to update the UI
+      await fetchInvestments(); 
+      
+      // 3. Provide feedback
+      alert(`Sync successful! Updated ${result.updated || 0} assets.`);
+    } catch (err) { 
+      console.error("Sync error:", err);
+      alert("Sync failed. Check your API keys and terminal."); 
+    }
+    setIsSyncing(false);
+  };
+
   const handleAddAsset = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -107,7 +167,6 @@ const Investments = () => {
     }
   };
 
-  // Prepares the custom modal for Full Asset Deletion
   const triggerDeleteAsset = (assetId, assetName) => {
     setConfirmDelete({
       isOpen: true,
@@ -118,7 +177,6 @@ const Investments = () => {
     });
   };
 
-  // Prepares the custom modal for Single Transaction Deletion
   const triggerDeleteTransaction = (txId) => {
     setConfirmDelete({
       isOpen: true,
@@ -129,7 +187,6 @@ const Investments = () => {
     });
   };
 
-  // Actually fires the API based on what the custom modal confirmed
   const executeDelete = async () => {
     try {
       if (confirmDelete.type === 'asset') {
@@ -171,12 +228,22 @@ const Investments = () => {
           <h1 className="text-2xl font-bold text-[#0F172A] dark:text-gray-200 mb-1">Wealth Portfolio</h1>
           <p className="text-sm text-gray-500 dark:text-[#a3a3a3]">Track and manage your multi-asset investments.</p>
         </div>
-        <button 
-          onClick={() => setIsAddModalOpen(true)}
-          className="flex items-center px-5 py-2.5 bg-[#0F172A] dark:bg-gray-200 text-white dark:text-[#0F172A] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-opacity"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Asset
-        </button>
+        <div className="flex gap-3 w-full sm:w-auto">
+          <button 
+            onClick={handleSync} 
+            disabled={isSyncing}
+            className="px-5 py-2.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:hover:bg-indigo-900/40 text-indigo-700 dark:text-indigo-400 rounded-xl text-sm font-bold border border-indigo-100 dark:border-indigo-900/30 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} /> 
+            {isSyncing ? 'Syncing...' : 'Live Market Sync'}
+          </button>
+          <button 
+            onClick={() => setIsAddModalOpen(true)}
+            className="flex items-center px-5 py-2.5 bg-[#0F172A] dark:bg-gray-200 text-white dark:text-[#0F172A] rounded-xl text-sm font-bold shadow-lg hover:opacity-90 transition-opacity"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Asset
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -187,10 +254,23 @@ const Investments = () => {
           <p className="text-sm text-blue-200">Across all asset classes</p>
         </div>
         
-        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
-          <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Day's P&L (Markets)</p>
-          <div className="flex items-end space-x-2"><h2 className={`text-2xl font-bold text-gray-400`}>Data Syncing...</h2></div>
-          <div className={`inline-flex items-center mt-2 px-2 py-1 rounded bg-opacity-20 text-xs font-bold bg-gray-100 text-gray-500`}>Awaiting live feed integration</div>
+        {/* NEW Interactive Live Market Sync Card */}
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
+          <div>
+            <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-1">Data Pipeline Status</p>
+            <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">FMP & CoinGecko Engine</h2>
+          </div>
+          <button 
+            onClick={handleSync}
+            disabled={isSyncing}
+            className="mt-4 w-full py-2 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#262626] text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl border border-gray-200 dark:border-[#262626] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {isSyncing ? (
+              <><RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" /> Fetching Live LTP...</>
+            ) : (
+              <><Activity className="w-3.5 h-3.5 text-emerald-500" /> Force Global Price Sync</>
+            )}
+          </button>
         </div>
 
         <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
@@ -296,6 +376,7 @@ const Investments = () => {
 
           {/* SIDEBAR INTEL GRID */}
           <div className="w-full xl:w-96 flex flex-col gap-6">
+            
             <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
               <div className="flex items-center space-x-2 mb-3">
                 <CircleDollarSign className="w-4 h-4 text-emerald-500" />
@@ -313,7 +394,26 @@ const Investments = () => {
                 <h3 className="text-sm font-bold uppercase tracking-widest text-indigo-900 dark:text-indigo-300">Market Intelligence</h3>
               </div>
               <div className="space-y-4">
-                 <p className="text-xs text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed text-center py-4">Live updates will stream dynamically.</p>
+                {marketAlerts.length > 0 ? (
+                  marketAlerts.map(alert => (
+                    <div key={alert.id} className="bg-white/60 dark:bg-[#0a0a0a]/60 backdrop-blur-sm p-4 rounded-xl border border-white dark:border-[#262626] shadow-sm">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex items-center space-x-2">
+                          {alert.type === 'dividend' ? <CircleDollarSign className="w-4 h-4 text-emerald-500" /> : <Calendar className="w-4 h-4 text-orange-500" />}
+                          <span className="text-xs font-bold text-[#0F172A] dark:text-gray-200">{alert.title}</span>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <p className="text-[10px] uppercase tracking-widest text-gray-500 font-bold">{alert.date}</p>
+                        <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{alert.value}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-indigo-800/80 dark:text-indigo-300/80 leading-relaxed text-center py-4">
+                    No upcoming corporate actions or dividends detected for your portfolio.
+                  </p>
+                )}
               </div>
             </div>
           </div>
@@ -335,7 +435,7 @@ const Investments = () => {
               >
                 <div className="flex justify-between items-start mb-6">
                   <div className="flex items-center space-x-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${item.type === 'Gold' ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-200 text-gray-600'}`}>
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center ${item.type.toLowerCase().includes('gold') ? 'bg-yellow-100 text-yellow-600' : 'bg-gray-200 text-gray-600'}`}>
                       <Coins className="w-6 h-6" />
                     </div>
                     <div>
