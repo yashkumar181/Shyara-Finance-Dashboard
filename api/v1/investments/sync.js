@@ -62,7 +62,7 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       const assets = await sql`
-        SELECT id, symbol, asset_type, name, metadata 
+        SELECT id, symbol, asset_type,asset_class, name, metadata 
         FROM investments 
         WHERE user_id = ${uid} 
         AND asset_class IN ('market', 'commodity')
@@ -137,8 +137,8 @@ export default async function handler(req, res) {
             const pricePerGramUSD = pricePerOunceUSD / 31.1035;
             const pricePerGramINR = pricePerGramUSD * usdInrRate;
 
-            // Indian Standard: Gold in 10g, Silver in 1kg (1000g)
-            livePrice = isSilver ? pricePerGramINR * 1000 : pricePerGramINR * 10;
+            // we use per gram price
+            livePrice = pricePerGramINR;
           }
 
           // ==========================================
