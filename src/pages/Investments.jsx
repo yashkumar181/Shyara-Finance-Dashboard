@@ -14,7 +14,7 @@ import { calculateRealTimeValue } from '../utils/valuation';
 const RealEstateCard = ({ property, onClick }) => {
   const pricePerSqFt = Number(property.avgPrice || property.price || 0);
   const area = Number(property.quantity || 0);
-  const totalPrincipal = pricePerSqFt * area;
+  const totalPrincipal = pricePerSqFt * area; 
   
   const growthRate = Number(property.metadata?.growth_rate || 0);
   const buyDate = property.metadata?.purchase_date || new Date().toISOString().split('T')[0];
@@ -95,7 +95,12 @@ const Investments = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAssetHistory, setSelectedAssetHistory] = useState(null);
+
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, type: '', id: null, title: '', message: '' });
+
+  // Sell flow: Tracks which existing holding was picked from the dropdown
+  const [selectedHoldingId, setSelectedHoldingId] = useState('');
+  const [maxSellQty, setMaxSellQty] = useState(null);
 
   const [formData, setFormData] = useState({
     action: 'Buy', asset_class: 'market', asset_type: 'Stock', symbol: '', name: '', quantity: '', price: '', 
@@ -113,6 +118,12 @@ const Investments = () => {
   useEffect(() => { fetchInvestments(); }, [api]);
 
   const safeInvestments = Array.isArray(investments) ? investments : [];
+
+  // Filter owned holdings dynamically based on selected asset class
+  const ownedHoldings = safeInvestments.filter(
+    inv => inv.asset_class === formData.asset_class && inv.quantity > 0
+  );
+
   const rawMarketAssets = safeInvestments.filter(i => i.asset_class === 'market');
   const commodities = safeInvestments.filter(i => i.asset_class === 'commodity');
   const realEstate = safeInvestments.filter(i => i.asset_class === 'real_estate');
@@ -210,8 +221,37 @@ const Investments = () => {
     setIsSyncing(false);
   };
 
+  // Populate form automatically when a user selects a holding from the "Sell" dropdown
+  const handleSelectHolding = (holdingId) => {
+    setSelectedHoldingId(holdingId);
+    const holding = ownedHoldings.find(h => String(h.id) === String(holdingId));
+    
+    if (!holding) { 
+      setMaxSellQty(null); 
+      setFormData({ ...formData, symbol: '', name: '', price: '' });
+      return; 
+    }
+    
+    setFormData({
+      ...formData,
+      symbol: holding.symbol || '',
+      name: holding.name || '',
+      asset_type: holding.asset_type || holding.type || formData.asset_type, // Safely handles mapping
+      quantity: '',
+      price: holding.currentPrice ? String(holding.currentPrice) : '' // Auto-fills LTP for convenience
+    });
+    setMaxSellQty(holding.quantity);
+  };
+
   const handleAddAsset = async (e) => {
     e.preventDefault();
+    
+    // Safety check preventing over-selling
+    if (formData.action === 'Sell' && maxSellQty !== null && parseFloat(formData.quantity) > maxSellQty) {
+      alert(`Transaction Rejected: You only own ${maxSellQty} units. You cannot sell ${formData.quantity}.`);
+      return;
+    }
+    
     setIsSubmitting(true);
     try {
       let payload = { ...formData };
@@ -230,8 +270,10 @@ const Investments = () => {
       payload.metadata = metadata;
       await api.createInvestment(payload);
       await fetchInvestments();
+      
       setIsAddModalOpen(false);
       setFormData({ action: 'Buy', asset_class: 'market', asset_type: 'Stock', symbol: '', name: '', quantity: '', price: '', date: new Date().toISOString().split('T')[0], location: '', interest_rate: '', growth_rate: '', purchase_date: '', maturity_date: '', coverage: '' });
+      setSelectedHoldingId(''); setMaxSellQty(null);
     } catch (error) { alert(error.response?.data?.error || "Failed to submit execution details."); } 
     finally { setIsSubmitting(false); }
   };
@@ -273,7 +315,6 @@ const Investments = () => {
           <p className="text-sm text-blue-200">Across all asset classes</p>
         </div>
         
-        {/* NEW Global Daily Change */}
         <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-center">
           <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Today's Global Change</p>
           <div className="flex items-end space-x-2">
@@ -329,7 +370,6 @@ const Investments = () => {
           </div>
           <div className="w-full xl:w-96 flex flex-col gap-6">
             
-            {/* NEW: Today's Market P&L */}
             <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
               <div className="flex items-center space-x-2 mb-3">
                 <Activity className={`w-4 h-4 ${marketOnlyDailyChange >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
@@ -433,13 +473,13 @@ const Investments = () => {
       {/* --- MODAL: RECORD ASSET TRANSACTION --- */}
       {isAddModalOpen && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-hidden">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsAddModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { setIsAddModalOpen(false); setSelectedHoldingId(''); setMaxSellQty(null); }}></div>
           <div className="relative w-full max-w-lg bg-white dark:bg-[#121212] rounded-2xl shadow-2xl border border-gray-200 dark:border-[#262626] flex flex-col max-h-[90vh]">
             <div className="px-6 py-5 border-b border-gray-200 dark:border-[#262626] flex justify-between items-center bg-white dark:bg-[#0a0a0a] rounded-t-2xl">
               <div>
                 <h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Record Asset Transaction</h2>
               </div>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
+              <button onClick={() => { setIsAddModalOpen(false); setSelectedHoldingId(''); setMaxSellQty(null); }} className="text-gray-400 hover:text-gray-600 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-[#262626]"><X className="w-5 h-5" /></button>
             </div>
             
             <form id="asset-form" onSubmit={handleAddAsset} className="p-6 overflow-y-auto space-y-5">
@@ -448,7 +488,7 @@ const Investments = () => {
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Transaction Type</label>
                 <div className="grid grid-cols-2 gap-3">
                   {['Buy', 'Sell'].map(act => (
-                    <div key={act} onClick={() => setFormData({...formData, action: act})} className={`cursor-pointer py-3 rounded-xl text-xs font-bold text-center border transition-all ${formData.action === act ? 'bg-[#0A3D8B] text-white border-transparent' : 'bg-gray-50 dark:bg-[#0a0a0a] border-gray-200 dark:border-[#262626] text-gray-600 dark:text-gray-400'}`}>
+                    <div key={act} onClick={() => { setFormData({...formData, action: act, symbol: '', name: '', quantity: '', price: ''}); setSelectedHoldingId(''); setMaxSellQty(null); }} className={`cursor-pointer py-3 rounded-xl text-xs font-bold text-center border transition-all ${formData.action === act ? 'bg-[#0A3D8B] text-white border-transparent' : 'bg-gray-50 dark:bg-[#0a0a0a] border-gray-200 dark:border-[#262626] text-gray-600 dark:text-gray-400'}`}>
                       {act === 'Buy' ? '🟢 Buy / Add Asset' : '🔴 Sell / Reduce Asset'}
                     </div>
                   ))}
@@ -457,7 +497,7 @@ const Investments = () => {
 
               <div>
                 <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Asset Class</label>
-                <select required value={formData.asset_class} onChange={(e) => setFormData({...formData, asset_class: e.target.value, asset_type: e.target.value === 'real_estate' ? 'Plot' : e.target.value === 'fixed_income' ? 'Fixed Deposit' : e.target.value === 'insurance' ? 'Term Life' : e.target.value === 'commodity' ? 'Gold' : 'Stock'})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] cursor-pointer">
+                <select required value={formData.asset_class} onChange={(e) => { setFormData({...formData, asset_class: e.target.value, asset_type: e.target.value === 'real_estate' ? 'Plot' : e.target.value === 'fixed_income' ? 'Fixed Deposit' : e.target.value === 'insurance' ? 'Term Life' : e.target.value === 'commodity' ? 'Gold' : 'Stock', symbol: '', name: '', quantity: '', price: ''}); setSelectedHoldingId(''); setMaxSellQty(null); }} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl appearance-none focus:outline-none focus:border-[#0A3D8B] cursor-pointer">
                   <option value="market">Market (Stock / ETF / Crypto)</option>
                   <option value="commodity">Commodity (Physical Gold / Silver)</option>
                   <option value="real_estate">Real Estate (Land / Property)</option>
@@ -469,58 +509,116 @@ const Investments = () => {
               {/* MARKET FORM */}
               {formData.asset_class === 'market' && (
                 <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 md:col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Asset Name</label>
-                      <input required type="text" placeholder="e.g. Delhivery" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                  {formData.action === 'Sell' ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Holding to Sell</label>
+                        <select required value={selectedHoldingId} onChange={(e) => handleSelectHolding(e.target.value)} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl cursor-pointer focus:outline-none focus:border-[#0A3D8B]">
+                          <option value="">Choose an asset you own...</option>
+                          {ownedHoldings.map(h => (
+                            <option key={h.id} value={h.id}>{h.symbol || h.name} ({h.type}) • {h.quantity} units owned</option>
+                          ))}
+                        </select>
+                        {ownedHoldings.length === 0 && <p className="text-xs text-red-500 mt-1.5">You don't currently own any market/crypto assets to sell.</p>}
+                      </div>
+                      {selectedHoldingId && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="col-span-1">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Qty to Sell (max {maxSellQty})</label>
+                            <input required type="number" step="0.00001" max={maxSellQty} placeholder="Units" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                          </div>
+                          <div className="col-span-1">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sell Price (₹)</label>
+                            <input required type="number" step="0.01" placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="col-span-2 md:col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Symbol / Ticker</label>
-                      <input type="text" placeholder="e.g. DELHIVERY" value={formData.symbol} onChange={(e) => setFormData({...formData, symbol: e.target.value.toUpperCase()})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Type</label>
-                      <input required type="text" placeholder="Stock, ETF..." value={formData.asset_type} onChange={(e) => setFormData({...formData, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Qty (Units)</label>
-                      <input required type="number" step="0.00001" placeholder="Units" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Avg Price (₹)</label>
-                      <input required type="number" step="0.01" placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Asset Name</label>
+                          <input required type="text" placeholder="e.g. Delhivery" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Symbol / Ticker</label>
+                          <input type="text" placeholder="e.g. DELHIVERY" value={formData.symbol} onChange={(e) => setFormData({...formData, symbol: e.target.value.toUpperCase()})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Type</label>
+                          <input required type="text" placeholder="Stock, ETF..." value={formData.asset_type} onChange={(e) => setFormData({...formData, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Qty (Units)</label>
+                          <input required type="number" step="0.00001" placeholder="Units" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Avg Price (₹)</label>
+                          <input required type="number" step="0.01" placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
               {/* COMMODITY FORM */}
               {formData.asset_class === 'commodity' && (
                 <>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2 md:col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Asset Name</label>
-                      <input required type="text" placeholder="e.g. Gold Coins" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                  {formData.action === 'Sell' ? (
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Select Holding to Sell</label>
+                        <select required value={selectedHoldingId} onChange={(e) => handleSelectHolding(e.target.value)} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl cursor-pointer focus:outline-none focus:border-[#0A3D8B]">
+                          <option value="">Choose a holding you own...</option>
+                          {ownedHoldings.map(h => (
+                            <option key={h.id} value={h.id}>{h.name} ({h.type}) • {h.quantity} g owned</option>
+                          ))}
+                        </select>
+                        {ownedHoldings.length === 0 && <p className="text-xs text-red-500 mt-1.5">You don't currently own any commodities to sell.</p>}
+                      </div>
+                      {selectedHoldingId && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="col-span-1">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Grams to Sell (max {maxSellQty})</label>
+                            <input required type="number" step="0.01" max={maxSellQty} placeholder="e.g. 20" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                          </div>
+                          <div className="col-span-1">
+                            <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Sell Price per Gram (₹)</label>
+                            <input required type="number" step="0.01" placeholder="Price" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="col-span-2 md:col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Metal Type</label>
-                      <select required value={formData.asset_type} onChange={(e) => setFormData({...formData, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl cursor-pointer focus:outline-none focus:border-[#0A3D8B]">
-                        <option value="Gold">Gold</option><option value="Silver">Silver</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Weight (Grams)</label>
-                      <input required type="number" step="0.01" placeholder="e.g. 50" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                    <div className="col-span-1">
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Purchase Price per Gram (₹)</label>
-                      <input required type="number" step="0.01" placeholder="e.g. 7100" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
-                    </div>
-                  </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Asset Name</label>
+                          <input required type="text" placeholder="e.g. Gold Coins" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                        <div className="col-span-2 md:col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Metal Type</label>
+                          <select required value={formData.asset_type} onChange={(e) => setFormData({...formData, asset_type: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-[#0F172A] dark:text-gray-200 text-sm font-semibold rounded-xl cursor-pointer focus:outline-none focus:border-[#0A3D8B]">
+                            <option value="Gold">Gold</option><option value="Silver">Silver</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Weight (Grams)</label>
+                          <input required type="number" step="0.01" placeholder="e.g. 50" value={formData.quantity} onChange={(e) => setFormData({...formData, quantity: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-2">Purchase Price per Gram (₹)</label>
+                          <input required type="number" step="0.01" placeholder="e.g. 7100" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full px-4 py-3 bg-white dark:bg-[#0a0a0a] border border-gray-200 dark:border-[#262626] text-sm font-semibold rounded-xl focus:outline-none focus:border-[#0A3D8B]" />
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </>
               )}
 
