@@ -7,9 +7,7 @@ const YAHOO_HEADERS = {
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36",
 };
 
-// Lightweight, no-auth-required Yahoo endpoint. Good for a single current price.
-// Works for equities, ETFs, commodities futures (GC=F, SI=F), forex (USDINR=X),
-// and crypto pairs (BTC-INR, ETH-INR, SOL-INR, ...).
+// Lightweight, no-auth-required Yahoo endpoint fetching both LTP and Previous Close
 async function fetchYahooPrice(symbol) {
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}`;
   const res = await fetch(url, { headers: YAHOO_HEADERS });
@@ -17,38 +15,16 @@ async function fetchYahooPrice(symbol) {
     throw new Error(`Yahoo chart fetch failed for ${symbol}: ${res.status} ${await res.text()}`);
   }
   const data = await res.json();
-  const result = data?.chart?.result?.[0];
-  const price = result?.meta?.regularMarketPrice;
-  if (price === undefined || price === null) {
+  const meta = data?.chart?.result?.[0]?.meta;
+  
+  if (!meta || meta.regularMarketPrice === undefined) {
     throw new Error(`No price returned by Yahoo for ${symbol}`);
   }
-  return price;
-}
-
-// Best-effort dividend/earnings enrichment via Yahoo's quoteSummary endpoint.
-// NOTE: Yahoo increasingly gates this behind a cookie+crumb handshake, so this
-// can fail even when the price fetch above succeeds. That's fine -- it's treated
-// as optional metadata, never blocks the price update itself.
-async function fetchYahooCalendarInfo(symbol) {
-  const url = `https://query2.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(
-    symbol
-  )}?modules=summaryDetail,calendarEvents`;
-  const res = await fetch(url, { headers: YAHOO_HEADERS });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const result = data?.quoteSummary?.result?.[0];
-  if (!result) return null;
-
-  const info = {};
-  const exDivTs = result.summaryDetail?.exDividendDate?.raw;
-  const divRate = result.summaryDetail?.dividendRate?.raw;
-  if (exDivTs) info.exDividendDate = new Date(exDivTs * 1000).toISOString().split("T")[0];
-  if (divRate !== undefined) info.dividendRate = divRate;
-
-  const earningsTs = result.calendarEvents?.earnings?.earningsDate?.[0]?.raw;
-  if (earningsTs) info.earningsDate = new Date(earningsTs * 1000).toISOString().split("T")[0];
-
-  return info;
+  
+  return {
+    price: meta.regularMarketPrice,
+    previousClose: meta.chartPreviousClose || meta.previousClose || meta.regularMarketPrice
+  };
 }
 
 export default async function handler(req, res) {
@@ -62,18 +38,20 @@ export default async function handler(req, res) {
   if (req.method === "POST") {
     try {
       const assets = await sql`
-        SELECT id, symbol, asset_type,asset_class, name, metadata 
+        SELECT id, symbol, asset_type, name, metadata, asset_class 
         FROM investments 
         WHERE user_id = ${uid} 
         AND asset_class IN ('market', 'commodity')
       `;
 
       let updatedCount = 0;
+      const fmpKey = process.env.FMP_API_KEY;
 
-      // PRE-FETCH FOREX: live USD/INR rate, used for all commodity (USD-quoted) conversions
-      let usdInrRate = 83.5; // Fallback rate
+      // PRE-FETCH FOREX: live USD/INR rate
+      let usdInrRate = 83.5; 
       try {
-        usdInrRate = await fetchYahooPrice("USDINR=X");
+        const { price } = await fetchYahooPrice("USDINR=X");
+        usdInrRate = price;
       } catch (e) {
         console.error("Failed to fetch USD/INR rate from Yahoo, using fallback:", e.message);
       }
@@ -83,62 +61,77 @@ export default async function handler(req, res) {
         let assetMetadata =
           typeof asset.metadata === "string" ? JSON.parse(asset.metadata) : asset.metadata || {};
 
+        const type = (asset.asset_type || "").trim().toLowerCase();
+        const className = (asset.asset_class || "").trim().toLowerCase();
+
         try {
           // ==========================================
           // 1. CRYPTO ENGINE (Yahoo, direct INR pairs)
           // ==========================================
-          if (asset.asset_type.toLowerCase() === "crypto" || asset.name.toLowerCase().includes("bitcoin")) {
+          if (type === "crypto" || asset.name.toLowerCase().includes("bitcoin")) {
             let base = asset.symbol;
             if (asset.name.toLowerCase().includes("bitcoin")) base = "BTC";
             else if (asset.name.toLowerCase().includes("ethereum")) base = "ETH";
             else if (asset.name.toLowerCase().includes("solana")) base = "SOL";
 
             const yahooSymbol = `${base}-INR`;
-            livePrice = await fetchYahooPrice(yahooSymbol);
+            const { price, previousClose } = await fetchYahooPrice(yahooSymbol);
+            
+            livePrice = price;
+            assetMetadata.previousClose = previousClose;
           }
 
           // ==========================================
-          // 2. STOCKS & ETFs ENGINE (Yahoo)
+          // 2. STOCKS & ETFs HYBRID ENGINE 
           // ==========================================
-          else if (
-            asset.asset_type.toLowerCase() === "stock" ||
-            asset.asset_type.toLowerCase() === "etf" ||
-            asset.asset_type.toLowerCase() === "mutual fund"
-          ) {
+          else if (type === "stock" || type === "etf" || type === "mutual fund") {
             const ticker = asset.symbol.includes(".") ? asset.symbol : `${asset.symbol}.NS`;
+            const { price, previousClose } = await fetchYahooPrice(ticker);
+            
+            livePrice = price;
+            assetMetadata.previousClose = previousClose;
 
-            livePrice = await fetchYahooPrice(ticker);
-
-            // Best-effort: dividend/earnings metadata. Never throws past this point.
-            try {
-              const calInfo = await fetchYahooCalendarInfo(ticker);
-              if (calInfo) {
-                if (calInfo.earningsDate) assetMetadata.earningsDate = calInfo.earningsDate;
-                if (calInfo.exDividendDate && new Date(calInfo.exDividendDate) >= new Date()) {
-                  assetMetadata.exDividendDate = calInfo.exDividendDate;
-                  assetMetadata.dividendRate = calInfo.dividendRate;
+            if (fmpKey) {
+              try {
+                const fmpQuoteRes = await fetch(`https://financialmodelingprep.com/api/v3/quote/${ticker}?apikey=${fmpKey}`);
+                if (fmpQuoteRes.ok) {
+                  const quoteData = await fmpQuoteRes.json();
+                  if (quoteData && quoteData.length > 0 && quoteData[0].earningsAnnouncement) {
+                    assetMetadata.earningsDate = quoteData[0].earningsAnnouncement;
+                  }
                 }
+
+                const divRes = await fetch(`https://financialmodelingprep.com/api/v3/historical-price-full/stock_dividend/${ticker}?apikey=${fmpKey}`);
+                if (divRes.ok) {
+                  const divData = await divRes.json();
+                  if (divData.historical && divData.historical.length > 0) {
+                    const latestDiv = divData.historical[0];
+                    if (new Date(latestDiv.date) >= new Date(new Date().setHours(0,0,0,0))) {
+                      assetMetadata.exDividendDate = latestDiv.date;
+                      assetMetadata.dividendRate = latestDiv.adjDividend || latestDiv.dividend;
+                    }
+                  }
+                }
+              } catch (fmpErr) {
+                console.error(`Intelligence fetch failed for ${ticker} (non-fatal):`, fmpErr.message);
               }
-            } catch (calErr) {
-              console.error(`Calendar info fetch failed for ${ticker} (non-fatal):`, calErr.message);
             }
           }
 
           // ==========================================
-          // 3. COMMODITIES ENGINE (Gold/Silver via Yahoo futures)
+          // 3. COMMODITIES ENGINE (Pure Yahoo Finance)
           // ==========================================
-          else if (asset.asset_class === "commodity") {
-            const isSilver = asset.asset_type.toLowerCase().includes("silver");
-            const futuresTicker = isSilver ? "SI=F" : "GC=F"; // COMEX Silver / Gold futures, USD per troy ounce
+          else if (className === "commodity") {
+            const isSilver = type.includes("silver");
+            const futuresTicker = isSilver ? "SI=F" : "GC=F";
 
-            const pricePerOunceUSD = await fetchYahooPrice(futuresTicker);
+            const { price: pricePerOunceUSD, previousClose: prevCloseOunceUSD } = await fetchYahooPrice(futuresTicker);
 
-            // Convert Troy Ounces to Grams (1 Troy Ounce = 31.1035 grams)
             const pricePerGramUSD = pricePerOunceUSD / 31.1035;
-            const pricePerGramINR = pricePerGramUSD * usdInrRate;
+            const prevCloseGramUSD = prevCloseOunceUSD / 31.1035;
 
-            // we use per gram price
-            livePrice = pricePerGramINR;
+            livePrice = pricePerGramUSD * usdInrRate;
+            assetMetadata.previousClose = prevCloseGramUSD * usdInrRate;
           }
 
           // ==========================================

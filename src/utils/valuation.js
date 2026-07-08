@@ -1,7 +1,7 @@
 /**
  * Dynamically calculates the present value of an asset based on time elapsed and growth rate.
  */
-export const calculateRealTimeValue = (principal, annualRatePercent, purchaseDateStr, compoundingType = 'annual') => {
+export const calculateRealTimeValue = (principal, annualRatePercent, purchaseDateStr, compoundingType = 'annual', targetDate = new Date()) => {
   const p = Number(principal || 0);
   
   if (!p || !purchaseDateStr || isNaN(annualRatePercent)) {
@@ -9,10 +9,9 @@ export const calculateRealTimeValue = (principal, annualRatePercent, purchaseDat
   }
 
   const purchaseDate = new Date(purchaseDateStr);
-  const today = new Date();
   
-  // Exact elapsed time in years
-  const diffTime = Math.max(0, today - purchaseDate);
+  // Exact elapsed time in years using the targetDate
+  const diffTime = Math.max(0, targetDate - purchaseDate);
   const t = diffTime / (1000 * 60 * 60 * 24 * 365.25);
   const r = Number(annualRatePercent) / 100;
 

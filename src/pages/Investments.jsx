@@ -14,7 +14,7 @@ import { calculateRealTimeValue } from '../utils/valuation';
 const RealEstateCard = ({ property, onClick }) => {
   const pricePerSqFt = Number(property.avgPrice || property.price || 0);
   const area = Number(property.quantity || 0);
-  const totalPrincipal = pricePerSqFt * area; // Total invested amount
+  const totalPrincipal = pricePerSqFt * area;
   
   const growthRate = Number(property.metadata?.growth_rate || 0);
   const buyDate = property.metadata?.purchase_date || new Date().toISOString().split('T')[0];
@@ -95,7 +95,6 @@ const Investments = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedAssetHistory, setSelectedAssetHistory] = useState(null);
-
   const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, type: '', id: null, title: '', message: '' });
 
   const [formData, setFormData] = useState({
@@ -149,6 +148,39 @@ const Investments = () => {
   
   const overallReturn = totalValue - totalInvested;
   const overallReturnPct = totalInvested > 0 ? ((totalValue - totalInvested) / totalInvested) * 100 : 0;
+
+  // --- DAILY CHANGE CALCULATIONS ---
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const marketDailyChange = safeInvestments
+    .filter(i => i.asset_class === 'market' || i.asset_class === 'commodity')
+    .reduce((sum, asset) => {
+      const prevClose = asset.metadata?.previousClose || asset.currentPrice; 
+      return sum + ((asset.currentPrice - prevClose) * asset.quantity);
+    }, 0);
+
+  const algorithmicDailyChange = safeInvestments
+    .filter(i => i.asset_class === 'real_estate' || i.asset_class === 'fixed_income')
+    .reduce((sum, asset) => {
+      const type = asset.asset_class === 'real_estate' ? 'annual' : 'quarterly';
+      const p = asset.asset_class === 'real_estate' ? (asset.avgPrice * asset.quantity) : asset.avgPrice;
+      const rate = asset.asset_class === 'real_estate' ? asset.metadata?.growth_rate : asset.metadata?.interest_rate;
+      
+      const valToday = calculateRealTimeValue(p, rate, asset.metadata?.purchase_date, type, new Date()).currentValue;
+      const valYesterday = calculateRealTimeValue(p, rate, asset.metadata?.purchase_date, type, yesterday).currentValue;
+      
+      return sum + (valToday - valYesterday);
+    }, 0);
+
+  const globalDailyChange = marketDailyChange + algorithmicDailyChange;
+  
+  const marketOnlyDailyChange = safeInvestments
+    .filter(i => i.asset_class === 'market')
+    .reduce((sum, asset) => {
+      const prevClose = asset.metadata?.previousClose || asset.currentPrice; 
+      return sum + ((asset.currentPrice - prevClose) * asset.quantity);
+    }, 0);
 
   const twelveMonthsAgo = new Date(); twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
   const realizedPnL12Months = safeInvestments.reduce((totalPnL, asset) => totalPnL + (asset.history || []).filter(tx => tx.action === 'Sell' && new Date(tx.date) >= twelveMonthsAgo).reduce((sum, tx) => sum + (tx.pnl || 0), 0), 0);
@@ -240,15 +272,21 @@ const Investments = () => {
           <h2 className="text-3xl font-bold mb-1">₹{totalValue.toLocaleString('en-IN')}</h2>
           <p className="text-sm text-blue-200">Across all asset classes</p>
         </div>
-        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-between">
-          <div><p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-1">Data Pipeline Status</p><h2 className="text-lg font-bold text-[#0F172A] dark:text-gray-200">Hybrid Evaluation Engine</h2></div>
-          <button onClick={handleSync} disabled={isSyncing} className="mt-4 w-full py-2 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#262626] text-gray-700 dark:text-gray-300 text-xs font-bold rounded-xl border border-gray-200 dark:border-[#262626] transition-colors flex items-center justify-center gap-2 disabled:opacity-50">
-            {isSyncing ? <><RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-500" /> Calculating Valuations...</> : <><Activity className="w-3.5 h-3.5 text-emerald-500" /> Force Global Price Sync</>}
-          </button>
+        
+        {/* NEW Global Daily Change */}
+        <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626] flex flex-col justify-center">
+          <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Today's Global Change</p>
+          <div className="flex items-end space-x-2">
+            <h2 className={`text-2xl font-bold ${globalDailyChange >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+              {globalDailyChange >= 0 ? '+' : ''}₹{globalDailyChange.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+            </h2>
+          </div>
+          <p className="text-xs text-gray-400 mt-1">24h delta across all asset classes</p>
         </div>
+
         <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
           <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400 mb-2">Overall Unrealized ROI</p>
-          <h2 className={`text-2xl font-bold ${overallReturn >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{overallReturn >= 0 ? '+' : ''}₹{overallReturn.toLocaleString('en-IN')}</h2>
+          <h2 className={`text-2xl font-bold ${overallReturn >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{overallReturn >= 0 ? '+' : ''}₹{overallReturn.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h2>
           <div className={`inline-flex items-center mt-2 px-2 py-1 rounded bg-opacity-20 text-xs font-bold ${overallReturn >= 0 ? 'bg-emerald-500 text-emerald-600 dark:text-emerald-400' : 'bg-red-500 text-red-600 dark:text-red-400'}`}>{overallReturn >= 0 ? <TrendingUp className="w-3 h-3 mr-1" /> : <TrendingDown className="w-3 h-3 mr-1" />}{overallReturnPct.toFixed(2)}% Total Yield</div>
         </div>
       </div>
@@ -290,6 +328,19 @@ const Investments = () => {
             </div>
           </div>
           <div className="w-full xl:w-96 flex flex-col gap-6">
+            
+            {/* NEW: Today's Market P&L */}
+            <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
+              <div className="flex items-center space-x-2 mb-3">
+                <Activity className={`w-4 h-4 ${marketOnlyDailyChange >= 0 ? 'text-emerald-500' : 'text-red-500'}`} />
+                <p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400">Today's Market P&L</p>
+              </div>
+              <h3 className={`text-2xl font-bold ${marketOnlyDailyChange >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>
+                {marketOnlyDailyChange >= 0 ? '+' : ''}₹{marketOnlyDailyChange.toLocaleString('en-IN', { maximumFractionDigits: 0 })}
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">00:00 AM to 11:59 PM (Equities & Crypto)</p>
+            </div>
+
             <div className="bg-white dark:bg-[#121212] p-6 rounded-2xl shadow-sm border border-gray-200 dark:border-[#262626]">
               <div className="flex items-center space-x-2 mb-3"><CircleDollarSign className="w-4 h-4 text-emerald-500" /><p className="text-[10px] uppercase tracking-widest font-bold text-gray-500 dark:text-gray-400">Realized P&L (12 Months)</p></div>
               <h3 className={`text-2xl font-bold ${realizedPnL12Months >= 0 ? 'text-emerald-600 dark:text-emerald-500' : 'text-red-600 dark:text-red-500'}`}>{realizedPnL12Months >= 0 ? '+' : ''}₹{realizedPnL12Months.toLocaleString('en-IN')}</h3>
