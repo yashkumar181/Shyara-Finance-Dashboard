@@ -25,3 +25,8 @@ dist-ssr
 *.sw?
 
 .vercel
+# Electron build outputs
+desktop-build/
+dist/
+win-unpacked/
+*.blockmap
